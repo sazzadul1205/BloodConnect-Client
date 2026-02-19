@@ -9,7 +9,7 @@ const BloodCompatibility = () => {
   ];
 
   return (
-    <section id="compatibility" className="py-20 bg-base-200">
+    <section id="compatibility" className="py-40 bg-base-200">
       <div className="max-w-7xl mx-auto px-4">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <CompatibilityInfo />

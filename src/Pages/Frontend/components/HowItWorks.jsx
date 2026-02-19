@@ -38,7 +38,7 @@ const HowItWorks = () => {
   ];
 
   return (
-    <section id="how-it-works" className="py-24 bg-linear-to-b from-base-100 to-base-200">
+    <section id="how-it-works" className="py-40 bg-linear-to-b from-base-100 to-base-200">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-extrabold">How It Works</h2>

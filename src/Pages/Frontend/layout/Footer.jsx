@@ -1,5 +1,5 @@
 import React from "react";
-import { FaTint, FaFacebook, FaTwitter, FaInstagram } from "react-icons/fa";
+import { FaTint, FaFacebook, FaTwitter, FaInstagram, FaHeart } from "react-icons/fa";
 
 const Footer = () => {
   return (
@@ -16,6 +16,12 @@ const Footer = () => {
             Connecting donors with patients. Saving lives through community
             support and real-time blood donation requests.
           </p>
+          <div className="mt-4 text-sm opacity-70">
+            <p>Version 1.0.0</p>
+            <p className="flex items-center gap-1 mt-1">
+              Developed with <FaHeart className="text-error text-xs" /> by Sazzadul Islam
+            </p>
+          </div>
         </aside>
 
         {/* Quick Links */}
@@ -70,10 +76,13 @@ const Footer = () => {
         </nav>
       </footer>
 
-      <footer className="footer sm:footer-horizontal footer-center bg-base-200 text-base-content p-4 border-t border-gray-300">
-        <aside>
-          <p>Copyright © {new Date().getFullYear()} - Made By Sazzadul Islam</p>
-        </aside>
+      <footer className="footer flex justify-between items-center sm:footer-horizontals bg-base-200 text-base-content p-4 border-t border-gray-300">
+
+        <p>Copyright © {new Date().getFullYear()} - Blood Connect v1.0.0</p>
+
+        <p className="text-sm">
+          Developed with React + Node.js by Sazzadul Islam
+        </p>
       </footer>
     </>
   );

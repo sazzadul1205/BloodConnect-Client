@@ -27,7 +27,7 @@ const Testimonials = () => {
   ];
 
   return (
-    <section id="testimonials" className="py-20 bg-base-200">
+    <section id="testimonials" className="py-40 bg-base-200">
       <div className="max-w-7xl mx-auto px-4">
         <SectionHeader
           title="Trusted by Thousands"

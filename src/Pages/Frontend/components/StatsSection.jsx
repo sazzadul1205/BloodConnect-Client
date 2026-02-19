@@ -32,7 +32,7 @@ const StatsSection = () => {
   ];
 
   return (
-    <section id="stats" className="py-20 relative">
+    <section id="stats" className="py-40 relative">
       <div className="max-w-7xl mx-auto px-4">
         <SectionHeader
           title="Our Impact in Numbers"

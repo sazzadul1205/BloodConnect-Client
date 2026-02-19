@@ -28,27 +28,49 @@ const Navbar = () => {
 
   // Intersection Observer for active tracking
   useEffect(() => {
-    const sections = document.querySelectorAll("section");
+    // Use setTimeout to ensure sections are rendered
+    const timeoutId = setTimeout(() => {
+      const sections = document.querySelectorAll("section");
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setActive(entry.target.id);
+      if (sections.length === 0) {
+        console.log("No sections found yet, retrying...");
+        return;
+      }
+
+      console.log("Found sections:", sections.length); // Debug log
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              console.log("Active section:", entry.target.id); // Debug log
+              setActive(entry.target.id);
+            }
+          });
+        },
+        {
+          threshold: 0.3, // Reduced threshold for better detection
+          rootMargin: "-100px 0px -100px 0px", // Adjust the detection area
+        }
+      );
+
+      sections.forEach((section) => {
+        if (section.id) {
+          observer.observe(section);
+        }
+      });
+
+      return () => {
+        sections.forEach((section) => {
+          if (section.id) {
+            observer.unobserve(section);
           }
         });
-      },
-      {
-        threshold: 0.6,
-      }
-    );
+      };
+    }, 500); // Wait 500ms for lazy-loaded sections to appear
 
-    sections.forEach((section) => observer.observe(section));
-
-    return () => {
-      sections.forEach((section) => observer.unobserve(section));
-    };
-  }, []);
+    return () => clearTimeout(timeoutId);
+  }, []); // Empty dependency array means this runs once after mount
 
   return (
     <nav className="bg-base-100 shadow-lg sticky top-0 z-50">
@@ -69,8 +91,8 @@ const Navbar = () => {
                 href={`#${link.href}`}
                 onClick={(e) => handleScroll(e, link.href)}
                 className={`cursor-pointer transition-all duration-300 ${active === link.href
-                  ? "text-error font-semibold border-b-2 border-error pb-1"
-                  : "hover:text-error font-semibold "
+                    ? "text-error font-semibold border-b-2 border-error pb-1"
+                    : "hover:text-error font-semibold"
                   }`}
               >
                 {link.name}
@@ -98,8 +120,8 @@ const Navbar = () => {
                 href={`#${link.href}`}
                 onClick={(e) => handleScroll(e, link.href)}
                 className={`block py-2 transition-all ${active === link.href
-                  ? "text-error font-semibold"
-                  : "hover:text-error"
+                    ? "text-error font-semibold"
+                    : "hover:text-error"
                   }`}
               >
                 {link.name}
