@@ -293,7 +293,7 @@ const Register = () => {
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={nextStep}
-                    className="btn btn-error w-full mt-4"
+                    className="btn btn-error text-white w-full mt-4"
                   >
                     Continue → Next Step
                   </motion.button>
@@ -404,7 +404,7 @@ const Register = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       onClick={nextStep}
-                      className="btn btn-error flex-1"
+                      className="btn btn-error text-white flex-1"
                     >
                       Continue →
                     </motion.button>
@@ -521,7 +521,7 @@ const Register = () => {
                         })}
                       />
                       <span className="label-text text-sm">
-                        I agree to the <a href="#" className="link link-error">Terms</a> and <a href="#" className="link link-error">Privacy Policy</a>
+                        I agree to the <Link to="/TermsPrivacy" className="link link-error">Terms</Link> and <Link to="/TermsPrivacy" className="link link-error">Privacy Policy</Link>
                       </span>
                     </label>
                     {errors.agreeTerms && (
@@ -546,7 +546,7 @@ const Register = () => {
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
                       disabled={loading}
-                      className="btn btn-error flex-1 gap-2 disabled:bg-error/50"
+                      className="btn btn-error text-white flex-1 gap-2 disabled:bg-error/50"
                     >
                       {loading ? (
                         <>
@@ -567,7 +567,7 @@ const Register = () => {
             {/* Login Link */}
             <p className="text-center text-sm mt-6">
               Already have an account?{" "}
-              <Link to="/auth/login" className="link link-error font-semibold hover:gap-2 transition-all">
+              <Link to="/login" className="link link-error font-semibold hover:gap-2 transition-all">
                 Sign In
               </Link>
             </p>

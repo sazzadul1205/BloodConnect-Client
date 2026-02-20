@@ -49,14 +49,20 @@ const useAuth = () => {
     async ({ email, phone, password }) => {
       setLoading(true);
       setError(null);
+
       try {
         const res = await axiosInstance.post("/auth/login", {
           email,
           phone,
           password,
         });
-        saveAuth(res.data.data.user, res.data.data.token);
-        return res.data;
+
+        const user = res.data.data.user;
+        const token = res.data.data.token;
+
+        saveAuth(user, token);
+
+        return user; 
       } catch (err) {
         setError(err);
         throw err;
@@ -66,7 +72,6 @@ const useAuth = () => {
     },
     [axiosInstance, saveAuth],
   );
-
   /**
    * Register function
    * Accepts user info, calls /auth/register API

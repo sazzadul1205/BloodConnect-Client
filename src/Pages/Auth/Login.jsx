@@ -43,22 +43,28 @@ const Login = () => {
     },
   });
 
+  // Redirect based on role
+  const roleRoutes = {
+    donor: "/donor/dashboard",
+    hospital: "/hospital/dashboard",
+    requester: "/requester/dashboard",
+    admin: "/admin/dashboard",
+  };
+
   // Submit handler
   const onSubmit = async (data) => {
     try {
-      // Prepare login data based on method
       const loginData = {
         password: data.password,
+        ...(loginMethod === "email"
+          ? { email: data.email }
+          : { phone: data.phone }),
       };
 
-      if (loginMethod === "email") {
-        loginData.email = data.email;
-      } else {
-        loginData.phone = data.phone;
-      }
+      const user = await login(loginData);
 
-      await login(loginData);
-      navigate("/dashboard"); // Redirect to dashboard after successful login
+      navigate(roleRoutes[user.role] || "/");
+
     } catch (err) {
       console.error("Login failed:", err);
     }
@@ -282,7 +288,7 @@ const Login = () => {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 disabled={loading}
-                className="btn btn-error w-full gap-2 text-base disabled:bg-error/50"
+                className="btn btn-error w-full gap-2 text-white disabled:bg-error/50"
               >
                 {loading ? (
                   <>
@@ -300,7 +306,7 @@ const Login = () => {
             {/* Register Link */}
             <p className="text-center text-sm mt-4">
               Don't have an account?{" "}
-              <Link to="/auth/register" className="link link-error font-semibold hover:gap-2 transition-all">
+              <Link to="/register" className="link link-error font-semibold hover:gap-2 transition-all">
                 Register Now
               </Link>
             </p>
