@@ -62,7 +62,7 @@ const useAuth = () => {
 
         saveAuth(user, token);
 
-        return user; 
+        return user;
       } catch (err) {
         setError(err);
         throw err;
@@ -134,6 +134,57 @@ const useAuth = () => {
   }, [axiosInstance, token, clearAuth]);
 
   /**
+   * Forgot Password
+   * Calls /auth/forgot-password
+   */
+  const forgotPassword = useCallback(
+    async (email) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await axiosInstance.post("/auth/forgot-password", {
+          email,
+        });
+
+        return res.data;
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [axiosInstance],
+  );
+
+  /**
+   * Reset Password
+   * Calls /auth/reset-password
+   */
+  const resetPassword = useCallback(
+    async ({ token, password }) => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const res = await axiosInstance.post("/auth/reset-password", {
+          token,
+          password,
+        });
+
+        return res.data;
+      } catch (err) {
+        setError(err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [axiosInstance],
+  );
+
+  /**
    * Optional: auto-refresh token on mount if token exists
    */
   useEffect(() => {
@@ -153,6 +204,8 @@ const useAuth = () => {
     register, // Register function
     logout, // Logout function
     refreshToken, // Refresh token function
+    forgotPassword, // Forgot password function
+    resetPassword, // Reset password function
   };
 };
 

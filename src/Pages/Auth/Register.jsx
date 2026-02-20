@@ -53,6 +53,7 @@ const Register = () => {
 
 
   // Watch form values
+  // eslint-disable-next-line react-hooks/incompatible-library
   const password = watch("password");
   const selectedRole = watch("role");
   const selectedBloodGroup = watch("bloodGroup");
