@@ -10,8 +10,8 @@ import './index.css'
 import Home from './Pages/Frontend/Home.jsx';
 
 // Auth Pages
-import Login from './Pages/Auth/Login.jsx';
-import Register from './Pages/Auth/Register.jsx';
+import Login from './Pages/auth/Login.jsx';
+import Register from './Pages/auth/Register.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

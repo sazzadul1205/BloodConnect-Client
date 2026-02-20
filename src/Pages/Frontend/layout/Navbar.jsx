@@ -8,6 +8,7 @@ import { FaTint, FaBars, FaTimes, FaChevronDown } from "react-icons/fa";
 
 // Components
 import ThemeToggle from "./ThemeToggle";
+import { Link } from "react-router";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,7 +22,6 @@ const Navbar = () => {
     { name: "How It Works", href: "how-it-works" },
     { name: "Compatibility", href: "compatibility" },
     { name: "Testimonials", href: "testimonials" },
-    { name: "Login", href: "Login-cta" },
   ];
 
   // Smooth scroll
@@ -91,7 +91,7 @@ const Navbar = () => {
               </a>
             ))}
             <ThemeToggle />
-            <button className="btn btn-error btn-sm">Login</button>
+            <Link to="/auth/login" className="btn btn-error btn-sm">Login</Link>
           </div>
 
           {/* Tablet Nav (md only, hidden on lg) */}
@@ -135,7 +135,7 @@ const Navbar = () => {
             </div>
 
             <ThemeToggle />
-            <button className="btn btn-error btn-sm">Login</button>
+            <Link to="/auth/login" className="btn btn-error btn-sm">Login</Link>
           </div>
 
           {/* Mobile Toggle */}
@@ -163,7 +163,7 @@ const Navbar = () => {
               {link.name}
             </a>
           ))}
-          <button className="btn btn-error btn-sm w-full mt-4">Login</button>
+          <Link to="/auth/login" className="btn btn-error btn-sm w-full mt-4">Login</Link>
         </div>
       </div>
     </nav>
