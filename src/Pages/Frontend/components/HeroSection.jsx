@@ -1,8 +1,10 @@
 // Pages/Frontend/components/HeroSection.jsx
 
-
+import React from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
+
+// Icons
 import { FaTint, FaHeartbeat, FaChevronRight } from "react-icons/fa";
 
 const containerVariants = {

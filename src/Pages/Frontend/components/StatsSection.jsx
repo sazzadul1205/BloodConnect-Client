@@ -1,7 +1,10 @@
 // Pages/Frontend/components/StatsSection.jsx
 
+import React from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
+
+// Icons
 import { FaUserFriends, FaHeartbeat, FaHospital, FaClock } from "react-icons/fa";
 
 const containerVariants = {

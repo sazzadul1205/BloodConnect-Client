@@ -3,6 +3,8 @@
 import React from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
+
+// Icons
 import { FaTint, FaFacebook, FaTwitter, FaInstagram, FaHeart } from "react-icons/fa";
 
 const containerVariants = {

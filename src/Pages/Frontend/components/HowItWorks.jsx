@@ -1,8 +1,11 @@
 // Pages/Frontend/components/HowItWorks.jsx
 
+// React
 import React, { useState } from "react";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
+
+// Icons
 import { FaTint, FaGlobe, FaMedal, FaChevronRight } from "react-icons/fa";
 
 const containerVariants = {

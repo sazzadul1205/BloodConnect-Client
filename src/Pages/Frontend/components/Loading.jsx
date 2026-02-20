@@ -1,3 +1,5 @@
+// Pages/Frontend/components/Loading.jsx
+
 import React from "react";
 
 const Loading = ({ message = "Loading...", fullScreen = true }) => {

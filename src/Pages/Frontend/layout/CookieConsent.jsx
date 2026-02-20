@@ -1,4 +1,9 @@
+// Pages/Frontend/layout/CookieConsent.jsx
+
+// React
 import React, { useEffect, useState } from "react";
+
+// Icons
 import { FaCookieBite } from "react-icons/fa";
 
 const COOKIE_NAME = "cookie_consent";

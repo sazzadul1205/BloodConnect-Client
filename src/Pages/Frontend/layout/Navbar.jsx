@@ -1,5 +1,12 @@
+// Pages/Frontend/layout/Navbar.jsx
+
+// React
 import React, { useEffect, useState } from "react";
+
+// Icons
 import { FaTint, FaBars, FaTimes, FaChevronDown } from "react-icons/fa";
+
+// Components
 import ThemeToggle from "./ThemeToggle";
 
 const Navbar = () => {
@@ -14,7 +21,7 @@ const Navbar = () => {
     { name: "How It Works", href: "how-it-works" },
     { name: "Compatibility", href: "compatibility" },
     { name: "Testimonials", href: "testimonials" },
-    { name: "Emergency", href: "emergency-cta" },
+    { name: "Login", href: "Login-cta" },
   ];
 
   // Smooth scroll
@@ -84,7 +91,7 @@ const Navbar = () => {
               </a>
             ))}
             <ThemeToggle />
-            <button className="btn btn-error btn-sm">Emergency</button>
+            <button className="btn btn-error btn-sm">Login</button>
           </div>
 
           {/* Tablet Nav (md only, hidden on lg) */}
@@ -94,8 +101,8 @@ const Navbar = () => {
                 key={link.name}
                 onClick={(e) => handleScroll(e, link.href)}
                 className={`relative px-2 py-1 font-semibold transition-all duration-300 ${active === link.href
-                    ? "text-error after:absolute after:-bottom-1 after:left-0 after:w-full after:h-0.5 after:bg-error"
-                    : "text-base-content hover:text-error"
+                  ? "text-error after:absolute after:-bottom-1 after:left-0 after:w-full after:h-0.5 after:bg-error"
+                  : "text-base-content hover:text-error"
                   }`}
               >
                 {link.name}
@@ -128,7 +135,7 @@ const Navbar = () => {
             </div>
 
             <ThemeToggle />
-            <button className="btn btn-error btn-sm">Emergency</button>
+            <button className="btn btn-error btn-sm">Login</button>
           </div>
 
           {/* Mobile Toggle */}
@@ -156,7 +163,7 @@ const Navbar = () => {
               {link.name}
             </a>
           ))}
-          <button className="btn btn-error btn-sm w-full mt-4">Emergency</button>
+          <button className="btn btn-error btn-sm w-full mt-4">Login</button>
         </div>
       </div>
     </nav>

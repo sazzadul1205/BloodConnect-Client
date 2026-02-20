@@ -1,3 +1,6 @@
+// Pages/Frontend/Home.jsx
+
+// React
 import React, { Suspense, lazy } from "react";
 
 // Layout

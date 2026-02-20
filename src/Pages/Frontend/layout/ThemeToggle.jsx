@@ -1,6 +1,12 @@
+// Pages/Frontend/layout/ThemeToggle.jsx
+
+// React
 import { useEffect, useState } from "react";
+
+// Icons
 import { FaMoon, FaSun } from "react-icons/fa";
 
+// Constants
 const COOKIE_NAME = "theme_preference";
 const COOKIE_EXPIRE_DAYS = 365;
 

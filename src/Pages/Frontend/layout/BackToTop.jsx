@@ -1,4 +1,9 @@
+// Pages/Frontend/layout/BackToTop.jsx
+
+// React
 import React, { useEffect, useState } from "react";
+
+// Icons
 import { FaArrowUp } from "react-icons/fa";
 
 const BackToTop = () => {
