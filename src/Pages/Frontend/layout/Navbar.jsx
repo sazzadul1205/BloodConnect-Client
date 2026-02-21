@@ -91,7 +91,7 @@ const Navbar = () => {
               </a>
             ))}
             <ThemeToggle />
-            <Link to="/login" className="btn btn-error btn-sm">Login</Link>
+            <Link to="/login" className="btn btn-error btn-sm text-white">Login</Link>
           </div>
 
           {/* Tablet Nav (md only, hidden on lg) */}
@@ -135,7 +135,7 @@ const Navbar = () => {
             </div>
 
             <ThemeToggle />
-            <Link to="/login" className="btn btn-error btn-sm">Login</Link>
+            <Link to="/login" className="btn btn-error btn-sm text-white">Login</Link>
           </div>
 
           {/* Mobile Toggle */}
@@ -163,7 +163,7 @@ const Navbar = () => {
               {link.name}
             </a>
           ))}
-          <Link to="/login" className="btn btn-error btn-sm w-full mt-4">Login</Link>
+          <Link to="/login" className="btn btn-error btn-sm text-white w-full mt-4">Login</Link>
         </div>
       </div>
     </nav>

@@ -1,5 +1,8 @@
 // hooks/useAuth.js
+import { useNavigate } from "react-router";
 import { useState, useEffect, useCallback } from "react";
+
+// Custom hooks
 import useAxiosPublic from "./useAxiosPublic";
 
 // Keys for localStorage to persist user and token
@@ -8,6 +11,7 @@ const USER_KEY = "auth_user";
 
 const useAuth = () => {
   const { axiosInstance } = useAxiosPublic(); // Axios instance for API calls
+  const navigate = useNavigate(); // Navigation hook
 
   // State for user and token, initialized from localStorage if available
   const [user, setUser] = useState(() => {
@@ -17,6 +21,7 @@ const useAuth = () => {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
   const [loading, setLoading] = useState(false); // Loading state for async actions
   const [error, setError] = useState(null); // Error state for API calls
+  const [isLoggingOut, setIsLoggingOut] = useState(false); // Loading state for logout
 
   /**
    * Save user and token to state and localStorage
@@ -107,13 +112,23 @@ const useAuth = () => {
    * Calls /auth/logout API (optional) and clears auth data
    */
   const logout = useCallback(async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+
     try {
-      await axiosInstance.post("/auth/logout"); // optional
-    } catch (err) {
-      console.warn("Logout API failed", err);
+      await axiosInstance.post("/auth/logout");
+    } catch (error) {
+      console.warn(
+        "Logout API failed:",
+        error?.response?.data || error.message,
+      );
+    } finally {
+      clearAuth(); // Always clear local auth
+      navigate("/login", { replace: true }); // Force redirect
+      setIsLoggingOut(false);
     }
-    clearAuth(); // always clear auth data locally
-  }, [axiosInstance, clearAuth]);
+  }, [axiosInstance, clearAuth, navigate, isLoggingOut]);
 
   /**
    * Refresh JWT token
