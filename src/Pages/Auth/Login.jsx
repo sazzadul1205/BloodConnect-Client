@@ -48,6 +48,7 @@ const Login = () => {
     donor: "/donor/dashboard",
     hospital: "/hospital/dashboard",
     requester: "/requester/dashboard",
+    blood_bank: "/blood_bank/dashboard",
     admin: "/admin/dashboard",
   };
 
@@ -63,12 +64,14 @@ const Login = () => {
 
       const user = await login(loginData);
 
+      console.log(user?.role);
       navigate(roleRoutes[user.role] || "/");
 
     } catch (err) {
       console.error("Login failed:", err);
     }
   };
+
 
   const fadeIn = {
     hidden: { opacity: 0, y: 20 },

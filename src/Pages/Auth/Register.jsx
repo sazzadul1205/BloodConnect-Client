@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import {
   FaTint, FaUser, FaEnvelope, FaLock, FaPhone, FaMapMarkerAlt,
   FaEye, FaEyeSlash, FaHeartbeat, FaArrowLeft, FaShieldAlt,
+  FaBuilding,
 } from "react-icons/fa";
 
 // Hooks
@@ -61,10 +62,12 @@ const Register = () => {
 
   // Form data
   const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+  // Roles array
   const roles = [
     { value: "donor", label: "Blood Donor", icon: FaTint, description: "I want to donate blood" },
     { value: "requester", label: "Blood Requester", icon: FaHeartbeat, description: "I need blood" },
     { value: "hospital", label: "Hospital Staff", icon: FaMapMarkerAlt, description: "I represent a hospital" },
+    { value: "blood_bank", label: "Blood Bank Staff", icon: FaBuilding, description: "I work at a blood bank" },
   ];
 
   // Step Next handler
@@ -104,8 +107,10 @@ const Register = () => {
         navigate("/donor/dashboard");
       } else if (data.role === "hospital") {
         navigate("/hospital/dashboard");
-      } else {
+      } else if (data.role === "requester") {
         navigate("/requester/dashboard");
+      } else if (data.role === "blood_bank") {
+        navigate("/blood_bank/dashboard");
       }
     } catch (err) {
       console.error("Registration failed:", err);

@@ -77,6 +77,7 @@ const useAuth = () => {
     },
     [axiosInstance, saveAuth],
   );
+  
   /**
    * Register function
    * Accepts user info, calls /auth/register API

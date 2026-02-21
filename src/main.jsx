@@ -27,6 +27,8 @@ import Donor_Layout from './Pages/backend/Donor/Layout/Donor_Layout.jsx';
 
 // Requester Pages
 import Requester_Layout from './Pages/backend/Requester/Layout/Requester_Layout.jsx';
+import Hospital_Layout from './Pages/backend/Hospital/Layout/Hospital_Layout.jsx';
+import Blood_Bank_Layout from './Pages/backend/Blood_Bank/Layout/Blood_Bank_Layout.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -61,6 +63,22 @@ createRoot(document.getElementById('root')).render(
             <Route element={<Requester_Layout />}>
 
               <Route path="/requester/dashboard" element={<h1 className='text-black'>Requester Dashboard</h1>} />
+            </Route>
+          </Route>
+
+          {/* Hospital Pages */}
+          <Route element={<RequireRole allowedRoles={["hospital", "admin"]} />} >
+            <Route element={<Hospital_Layout />}>
+
+              <Route path="/hospital/dashboard" element={<h1 className='text-black'>Hospital Dashboard</h1>} />
+            </Route>
+          </Route>
+
+          {/* Blood Bank Pages */}
+          <Route element={<RequireRole allowedRoles={["blood_bank", "admin"]} />} >
+            <Route element={<Blood_Bank_Layout />}>
+
+              <Route path="/blood_bank/dashboard" element={<h1 className='text-black'>Blood Bank Dashboard</h1>} />
             </Route>
           </Route>
         </Route>
