@@ -1,7 +1,10 @@
-// Pages/backend/Donor/Layout/Blood_Bank_Layout.jsx
+// Pages/backend/Common/Layout/Backend_Layout.jsx
 
-import React, { useState, useEffect } from "react";
+// React
 import { Outlet, NavLink } from "react-router";
+import React, { useState, useEffect } from "react";
+
+// Icons
 import {
   FiHome,
   FiSettings,
@@ -14,18 +17,90 @@ import {
   FiChevronRight,
   FiUsers,
   FiClipboard,
+  FiUser,
+  FiActivity,
+  FiSliders,
+  FiClock,
+  FiDroplet,
+  FiMapPin,
+  FiPlusCircle,
+  FiList,
+  FiBarChart2,
 } from "react-icons/fi";
 import { FaHeartbeat } from "react-icons/fa";
-import useAuth from "../../../../hooks/useAuth";
-import ThemeToggle from "../../../Frontend/layout/ThemeToggle";
 
-const Blood_Bank_Layout = () => {
+// Hooks
+import useAuth from "../../../hooks/useAuth";
+
+// ThemeToggle
+import ThemeToggle from "../../Frontend/layout/ThemeToggle";
+
+
+// Navigation configurations for different user types
+const navigationConfig = {
+  donor: [
+    { name: "Dashboard", path: "/donor/dashboard", icon: FiHome },
+    { name: "Profile", path: "/donor/profile", icon: FiUser },
+    { name: "Medical Info", path: "/donor/medical-info", icon: FiActivity },
+    { name: "Preferences", path: "/donor/preferences", icon: FiSliders },
+    { name: "Donation History", path: "/donor/donation-history", icon: FiClock },
+    { name: "Blood Requests", path: "/donor/blood-requests", icon: FiDroplet },
+    { name: "Events", path: "/donor/events", icon: FiCalendar },
+    { name: "Settings", path: "/donor/settings", icon: FiSettings },
+  ],
+
+  hospital: [
+    { name: "Dashboard", path: "/hospital/dashboard", icon: FiHome },
+    { name: "Blood Banks", path: "/hospital/blood-banks", icon: FiMapPin },
+    { name: "Blood Requests", path: "/hospital/blood-requests", icon: FiDroplet },
+    { name: "Donor Search", path: "/hospital/donor-search", icon: FiUser },
+    { name: "Events", path: "/hospital/events", icon: FiCalendar },
+    { name: "Settings", path: "/hospital/settings", icon: FiSettings },
+  ],
+
+  requester: [
+    { name: "Dashboard", path: "/requester/dashboard", icon: FiHome },
+    { name: "Create Request", path: "/requester/create-request", icon: FiPlusCircle },
+    { name: "My Requests", path: "/requester/my-requests", icon: FiList },
+    { name: "Request Details", path: "/requester/request-details", icon: FiClipboard },
+    { name: "Blood Banks", path: "/requester/blood-banks", icon: FiMapPin },
+    { name: "Settings", path: "/requester/settings", icon: FiSettings },
+  ],
+
+  blood_bank: [
+    { name: "Bank Profile", path: "/blood_bank/bank-profile", icon: FiHome },
+    { name: "Inventory Management", path: "/blood_bank/inventory-management", icon: FiClipboard },
+    { name: "Events Management", path: "/blood_bank/events-management", icon: FiCalendar },
+    { name: "Staff Dashboard", path: "/blood_bank/staff-dashboard", icon: FiUsers },
+    { name: "Settings", path: "/blood_bank/settings", icon: FiSettings },
+  ],
+
+  admin: [
+    { name: "Admin Dashboard", path: "/admin/dashboard", icon: FiHome },
+    { name: "Users Management", path: "/admin/users-management", icon: FiUsers },
+    { name: "Audit Logs", path: "/admin/audit-logs", icon: FiClipboard },
+    { name: "System Stats", path: "/admin/system-stats", icon: FiBarChart2 },
+    { name: "Blood Banks Management", path: "/admin/blood-banks-management", icon: FiMapPin },
+    { name: "Settings", path: "/admin/settings", icon: FiSettings },
+  ],
+};
+
+const Backend_Layout = ({ userType }) => {
   const { user, logout } = useAuth();
 
   // States
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Get navigation items based on user type
+  const navigation = navigationConfig[userType] || navigationConfig.donor;
+
+  // Format user type for display (capitalize and handle special cases)
+  const formatUserType = (type) => {
+    if (type === "blood_bank") return "Blood Bank";
+    return type.charAt(0).toUpperCase() + type.slice(1);
+  };
 
   // Toggle fullscreen
   const toggleFullscreen = () => {
@@ -42,15 +117,6 @@ const Blood_Bank_Layout = () => {
     document.addEventListener("fullscreenchange", handleChange);
     return () => document.removeEventListener("fullscreenchange", handleChange);
   }, []);
-
-  // Navigation links
-  const navigation = [
-    { name: "Bank Profile", path: "/hospital/bank-profile", icon: FiHome },
-    { name: "Inventory Management", path: "/hospital/inventory-management", icon: FiClipboard },
-    { name: "Events Management", path: "/hospital/events-management", icon: FiCalendar },
-    { name: "Staff Dashboard", path: "/hospital/staff-dashboard", icon: FiUsers },
-    { name: "Settings", path: "/hospital/settings", icon: FiSettings },
-  ];
 
   return (
     <div className="flex flex-col lg:flex-row bg-base-200 min-h-screen">
@@ -112,7 +178,10 @@ const Blood_Bank_Layout = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
-              <h1 className="text-xl font-bold">BloodConnect</h1>
+              <div className="flex items-center gap-2">
+                <FaHeartbeat className="text-error text-xl" />
+                <h1 className="text-xl font-bold">BloodConnect</h1>
+              </div>
               <button onClick={() => setMobileMenuOpen(false)} className="btn btn-ghost btn-sm">
                 <FiChevronLeft />
               </button>
@@ -123,6 +192,7 @@ const Blood_Bank_Layout = () => {
                 <li key={item.name}>
                   <NavLink
                     to={item.path}
+                    onClick={() => setMobileMenuOpen(false)}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
                       }`
@@ -166,7 +236,9 @@ const Blood_Bank_Layout = () => {
           {/* Desktop Greeting */}
           <div className="flex-1 pl-3 hidden lg:block">
             <h2 className="text-lg font-semibold tracking-wide">
-              Welcome back, <span className="text-error ml-2">Blood Bank : {user?.profile?.fullName || "User"}</span>
+              Welcome back, <span className="text-error ml-2">
+                {formatUserType(userType)} : {user?.profile?.fullName || "User"}
+              </span>
             </h2>
           </div>
 
@@ -182,7 +254,7 @@ const Blood_Bank_Layout = () => {
 
             <div className="avatar">
               <div className="w-9 rounded-full bg-error text-white flex items-center justify-center font-semibold shadow">
-                {user?.profile?.fullName.charAt(0) || "U"}
+                {user?.profile?.fullName?.charAt(0) || "U"}
               </div>
             </div>
 
@@ -206,7 +278,8 @@ const Blood_Bank_Layout = () => {
             key={idx}
             to={item.path}
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center text-xs transition-all duration-200 ${isActive ? "text-error" : "text-base-content"}`
+              `flex flex-col items-center justify-center text-xs transition-all duration-200 ${isActive ? "text-error" : "text-base-content"
+              }`
             }
           >
             <item.icon size={22} />
@@ -219,4 +292,4 @@ const Blood_Bank_Layout = () => {
   );
 };
 
-export default Blood_Bank_Layout;
+export default Backend_Layout;

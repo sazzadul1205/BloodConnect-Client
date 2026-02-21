@@ -22,13 +22,8 @@ import TermsPrivacy from './Pages/auth/TermsPrivacy.jsx';
 import RequireAuth from './middleware/RequireAuth.jsx';
 import RequireRole from './middleware/RequireRole.jsx';
 
-// Donor Pages
-import Donor_Layout from './Pages/backend/Donor/Layout/Donor_Layout.jsx';
-
-// Requester Pages
-import Requester_Layout from './Pages/backend/Requester/Layout/Requester_Layout.jsx';
-import Hospital_Layout from './Pages/backend/Hospital/Layout/Hospital_Layout.jsx';
-import Blood_Bank_Layout from './Pages/backend/Blood_Bank/Layout/Blood_Bank_Layout.jsx';
+// Backend Layout
+import Backend_Layout from './Pages/backend/Layout/Backend_Layout.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -52,7 +47,7 @@ createRoot(document.getElementById('root')).render(
 
           {/* Donor Pages */}
           <Route element={<RequireRole allowedRoles={["donor", "admin"]} />} >
-            <Route element={<Donor_Layout />}>
+            <Route element={<Backend_Layout userType="donor" />}>
 
               <Route path="/donor/dashboard" element={<h1 className='text-black'>Donor Dashboard</h1>} />
             </Route>
@@ -60,7 +55,7 @@ createRoot(document.getElementById('root')).render(
 
           {/* Requester Pages */}
           <Route element={<RequireRole allowedRoles={["requester", "admin"]} />} >
-            <Route element={<Requester_Layout />}>
+            <Route element={<Backend_Layout userType="requester" />}>
 
               <Route path="/requester/dashboard" element={<h1 className='text-black'>Requester Dashboard</h1>} />
             </Route>
@@ -68,7 +63,7 @@ createRoot(document.getElementById('root')).render(
 
           {/* Hospital Pages */}
           <Route element={<RequireRole allowedRoles={["hospital", "admin"]} />} >
-            <Route element={<Hospital_Layout />}>
+            <Route element={<Backend_Layout userType="hospital" />}>
 
               <Route path="/hospital/dashboard" element={<h1 className='text-black'>Hospital Dashboard</h1>} />
             </Route>
@@ -76,9 +71,17 @@ createRoot(document.getElementById('root')).render(
 
           {/* Blood Bank Pages */}
           <Route element={<RequireRole allowedRoles={["blood_bank", "admin"]} />} >
-            <Route element={<Blood_Bank_Layout />}>
+            <Route element={<Backend_Layout userType="blood_bank" />}>
 
               <Route path="/blood_bank/dashboard" element={<h1 className='text-black'>Blood Bank Dashboard</h1>} />
+            </Route>
+          </Route>
+
+          {/* Blood Bank Pages */}
+          <Route element={<RequireRole allowedRoles={["admin"]} />} >
+            <Route element={<Backend_Layout userType="admin" />}>
+
+              <Route path="/admin/dashboard" element={<h1 className='text-black'>Blood Bank Dashboard</h1>} />
             </Route>
           </Route>
         </Route>
