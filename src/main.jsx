@@ -21,7 +21,12 @@ import Unauthorized from './Pages/auth/Unauthorized.jsx';
 import TermsPrivacy from './Pages/auth/TermsPrivacy.jsx';
 import RequireAuth from './middleware/RequireAuth.jsx';
 import RequireRole from './middleware/RequireRole.jsx';
+
+// Donor Pages
 import Donor_Layout from './Pages/backend/Donor/Layout/Donor_Layout.jsx';
+
+// Requester Pages
+import Requester_Layout from './Pages/backend/Requester/Layout/Requester_Layout.jsx';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -42,10 +47,20 @@ createRoot(document.getElementById('root')).render(
         <Route path="/TermsPrivacy" element={<TermsPrivacy />} />
 
         <Route element={<RequireAuth />} >
+
+          {/* Donor Pages */}
           <Route element={<RequireRole allowedRoles={["donor", "admin"]} />} >
             <Route element={<Donor_Layout />}>
 
               <Route path="/donor/dashboard" element={<h1 className='text-black'>Donor Dashboard</h1>} />
+            </Route>
+          </Route>
+
+          {/* Requester Pages */}
+          <Route element={<RequireRole allowedRoles={["requester", "admin"]} />} >
+            <Route element={<Requester_Layout />}>
+
+              <Route path="/requester/dashboard" element={<h1 className='text-black'>Requester Dashboard</h1>} />
             </Route>
           </Route>
         </Route>
