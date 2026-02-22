@@ -30,6 +30,7 @@ import {
 // Hooks
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 import useAuth from "../../../../../hooks/useAuth";
+import BloodLoader from "../../../../../shared/BloodLoader";
 
 const AddUserModal = ({ refreshUsers }) => {
   const { axiosInstance } = useAxiosPublic();
@@ -157,7 +158,7 @@ const AddUserModal = ({ refreshUsers }) => {
     }
   };
 
-  if (authLoading) return <div>Loading...</div>;
+  if (authLoading) return <BloodLoader fullscreen={false} />;
 
   return (
     <div className="modal-box w-11/12 max-w-2xl p-0 overflow-hidden bg-base-100">

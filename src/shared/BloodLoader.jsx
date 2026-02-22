@@ -1,13 +1,13 @@
-
 import { FaHeartbeat } from "react-icons/fa";
 
-const BloodLoader = () => {
+const BloodLoader = ({ fullscreen = true }) => {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-base-200">
-
+    <div
+      className={`flex flex-col items-center justify-center ${fullscreen ? "min-h-screen bg-base-200" : "py-10"
+        }`}
+    >
       {/* IV Bag */}
-      <div className="relative flex flex-col items-center mb-8">
-
+      <div className="relative flex flex-col items-center mb-6">
         <div className="w-24 h-32 bg-base-100 border border-base-300 rounded-2xl shadow-xl flex flex-col items-center justify-between p-3">
 
           {/* Medical Icon */}
@@ -28,7 +28,7 @@ const BloodLoader = () => {
         Connecting Donors...
       </p>
 
-      {/* Custom Animations */}
+      {/* Animation */}
       <style>
         {`
           @keyframes bloodFlow {

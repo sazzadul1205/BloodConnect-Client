@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import Swal from "sweetalert2";
 import {
   FiUsers,
   FiUserCheck,
@@ -26,7 +27,9 @@ import { FaHeartbeat, FaUserCircle } from "react-icons/fa";
 import Pagination from "../../../../shared/Pagination";
 import ResultsCount from "../../../../shared/ResultsCount";
 import AddUserModal from "./AddUserModal/AddUserModal";
-
+import EditUserModal from "./EditUserModal/EditUserModal";
+import ViewUserModal from "./ViewUserModal/ViewUserModal";
+import { showExportOptions } from "./userExport";
 
 const UsersManagement = () => {
   const { axiosInstance } = useAxiosPublic();
@@ -38,7 +41,10 @@ const UsersManagement = () => {
   const [activeTab, setActiveTab] = useState("all");
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedRole, setSelectedRole] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedVerification, setSelectedVerification] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Role colors and styles
   const roleConfig = {
@@ -157,6 +163,111 @@ const UsersManagement = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  // Handle export button click
+  const handleExport = () => {
+    showExportOptions(filteredUsers, activeTab, setIsExporting);
+  };
+
+  // Delete user handler with SweetAlert2
+  const handleDeleteUser = async (userId, userName) => {
+    try {
+      const result = await Swal.fire({
+        title: "Are you sure?",
+        html: `
+          <div class="text-left">
+            <p class="mb-3">You are about to delete user:</p>
+            <p class="font-semibold text-error">${userName}</p>
+            <p class="mt-3 text-sm opacity-70">This action will deactivate the user account. The user will no longer be able to access the system.</p>
+            <p class="text-sm font-semibold text-warning">This action can be reversed by an admin.</p>
+          </div>
+        `,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#ef4444",
+        cancelButtonColor: "#6b7280",
+        confirmButtonText: "Yes, delete user",
+        cancelButtonText: "Cancel",
+        reverseButtons: true,
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          title: "text-lg font-bold text-error",
+          htmlContainer: "text-base text-base-content/80",
+          confirmButton: "btn btn-sm btn-error text-white",
+          cancelButton: "btn btn-sm",
+        },
+        buttonsStyling: false,
+        showLoaderOnConfirm: true,
+        preConfirm: async () => {
+          setIsDeleting(true);
+          try {
+            const response = await axiosInstance.delete(`/users/${userId}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+
+            if (response.data?.success) {
+              return response.data;
+            } else {
+              throw new Error(response.data?.error || "Failed to delete user");
+            }
+          } catch (error) {
+            Swal.showValidationMessage(
+              error.response?.data?.error || error.message || "Failed to delete user"
+            );
+            throw error;
+          } finally {
+            setIsDeleting(false);
+          }
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+      });
+
+      if (result.isConfirmed) {
+        await Swal.fire({
+          title: "Deleted!",
+          html: `
+            <div class="text-center">
+              <p class="mb-2">User <span class="font-semibold text-error">${userName}</span> has been deleted successfully.</p>
+              <p class="text-sm opacity-70">The user account has been deactivated.</p>
+            </div>
+          `,
+          icon: "success",
+          timer: 3000,
+          showConfirmButton: true,
+          confirmButtonColor: "#22c55e",
+          confirmButtonText: "OK",
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            title: "text-lg font-bold text-success",
+            htmlContainer: "text-base text-base-content/80",
+            confirmButton: "btn btn-sm btn-success text-white",
+          },
+          buttonsStyling: false,
+        });
+
+        // Refresh the users list
+        usersRefetch();
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      await Swal.fire({
+        title: "Error!",
+        text: error.response?.data?.error || "Failed to delete user. Please try again.",
+        icon: "error",
+        timer: 3000,
+        showConfirmButton: true,
+        confirmButtonColor: "#ef4444",
+        confirmButtonText: "OK",
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          title: "text-lg font-bold text-error",
+          content: "text-base text-base-content/80",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
+      });
+    }
+  };
+
   // Reset pagination when filters change
   React.useEffect(() => {
     setCurrentPage(1);
@@ -175,6 +286,13 @@ const UsersManagement = () => {
     );
   }
 
+  const CloseModal = () => {
+    setSelectedUserId(null);
+    document.getElementById('add_user_modal')?.close();
+    document.getElementById('view_user_modal')?.close();
+    document.getElementById('edit_user_modal')?.close();
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -191,11 +309,27 @@ const UsersManagement = () => {
 
         {/* Action Buttons */}
         <div className="flex gap-2">
-          <button className="btn btn-outline btn-sm gap-2">
-            <FiDownload size={16} />
-            Export
+          <button
+            onClick={handleExport}
+            className="btn btn-outline btn-sm gap-2"
+            disabled={isExporting || filteredUsers.length === 0}
+          >
+            {isExporting ? (
+              <>
+                <span className="loading loading-spinner loading-sm"></span>
+                Exporting...
+              </>
+            ) : (
+              <>
+                <FiDownload size={16} />
+                Export ({filteredUsers.length})
+              </>
+            )}
           </button>
-          <button onClick={() => document.getElementById('add_user_modal').showModal()} className="btn btn-error btn-sm gap-2">
+          <button
+            onClick={() => document.getElementById('add_user_modal')?.showModal()}
+            className="btn btn-error btn-sm gap-2"
+          >
             <FiUserPlus size={16} />
             Add User
           </button>
@@ -257,48 +391,36 @@ const UsersManagement = () => {
 
       {/* Tabs */}
       <div className="tabs tabs-boxed bg-base-100 p-1 border border-base-300">
-
-        {/* All Tab button */}
         <button
           className={`tab tab-sm ${activeTab === "all" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("all")}
         >
           All Users
         </button>
-
-        {/* Donor Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "donors" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("donors")}
         >
           Donors
         </button>
-
-        {/* Hospital Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "hospitals" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("hospitals")}
         >
           Hospitals
         </button>
-
-        {/* Requester Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "requesters" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("requesters")}
         >
           Requesters
         </button>
-
-        {/* Blood Bank Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "blood_banks" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("blood_banks")}
         >
           Blood Banks
         </button>
-
-        {/* Admin Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "admins" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("admins")}
@@ -379,10 +501,9 @@ const UsersManagement = () => {
         setItemsPerPage={setItemsPerPage}
       />
 
-      {/* Users Table */}
+      {/* Content */}
       <div className="overflow-x-auto bg-base-100 rounded-lg shadow-sm border border-base-300">
         <table className="table table-zebra w-full">
-
           {/* Table Header */}
           <thead>
             <tr className="bg-base-200">
@@ -403,9 +524,10 @@ const UsersManagement = () => {
             {paginatedUsers.length > 0 ? (
               paginatedUsers.map((user, index) => {
                 const RoleIcon = roleConfig[user.role]?.icon || FiUserCheck;
+                const userName = user.profile?.fullName || user.email || "Unknown User";
+
                 return (
                   <tr key={user._id} className="hover">
-
                     {/* User Index */}
                     <td className="font-medium">{startIndex + index + 1}</td>
 
@@ -508,17 +630,38 @@ const UsersManagement = () => {
                     <td>
                       <div className="flex justify-center gap-1">
                         {/* View */}
-                        <button className="btn btn-ghost btn-sm btn-square tooltip" data-tip="View">
+                        <button
+                          onClick={() => {
+                            setSelectedUserId(user?._id);
+                            document.getElementById('view_user_modal')?.showModal();
+                          }}
+                          className="btn btn-ghost btn-sm btn-square tooltip"
+                          data-tip="View"
+                          disabled={isDeleting || isExporting}
+                        >
                           <FiEye size={16} />
                         </button>
 
                         {/* Edit */}
-                        <button className="btn btn-ghost btn-sm btn-square tooltip" data-tip="Edit">
+                        <button
+                          onClick={() => {
+                            setSelectedUserId(user?._id);
+                            document.getElementById('edit_user_modal')?.showModal();
+                          }}
+                          className="btn btn-ghost btn-sm btn-square tooltip"
+                          data-tip="Edit"
+                          disabled={isDeleting || isExporting}
+                        >
                           <FiEdit2 size={16} />
                         </button>
 
                         {/* Delete */}
-                        <button className="btn btn-ghost btn-sm btn-square text-error tooltip" data-tip="Delete">
+                        <button
+                          onClick={() => handleDeleteUser(user._id, userName)}
+                          className="btn btn-ghost btn-sm btn-square text-error tooltip"
+                          data-tip="Delete"
+                          disabled={isDeleting || isExporting}
+                        >
                           <FiTrash2 size={16} />
                         </button>
                       </div>
@@ -554,12 +697,34 @@ const UsersManagement = () => {
 
       {/* Add User Modal */}
       <dialog id="add_user_modal" className="modal">
+        <AddUserModal
+          onClose={() => CloseModal()}
+          refreshUsers={() => usersRefetch()}
+        />
+        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
 
-        {/* Add User Modal */}
-        <AddUserModal refreshUsers={() => usersRefetch()} />
+      {/* Edit User Modal */}
+      <dialog id="edit_user_modal" className="modal">
+        <EditUserModal
+          userId={selectedUserId}
+          onClose={() => CloseModal()}
+          refreshUsers={() => usersRefetch()}
+        />
+        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
 
-        {/* Close Modal */}
-        <form method="dialog" className="modal-backdrop">
+      {/* View User Modal */}
+      <dialog id="view_user_modal" className="modal">
+        <ViewUserModal
+          userId={selectedUserId}
+          onClose={() => CloseModal()}
+        />
+        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
         </form>
       </dialog>
