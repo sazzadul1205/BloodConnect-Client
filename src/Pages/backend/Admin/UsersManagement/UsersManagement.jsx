@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import useAxiosPublic from "../../../hooks/useAxiosPublic";
-import BloodLoader from "../../../shared/BloodLoader";
-import ErrorState from "../../../shared/ErrorState";
+import useAxiosPublic from "../../../../hooks/useAxiosPublic";
+import BloodLoader from "../../../../shared/BloodLoader";
+import ErrorState from "../../../../shared/ErrorState";
 import {
   FiUsers,
   FiUserCheck,
@@ -18,41 +18,36 @@ import {
   FiEye,
   FiRefreshCw,
   FiDownload,
-  FiFilter,
-  FiSearch,
-  FiChevronLeft,
-  FiChevronRight,
-  FiChevronsLeft,
-  FiChevronsRight,
   FiUserPlus,
   FiCheckCircle,
   FiXCircle,
-  FiClock,
 } from "react-icons/fi";
 import { FaHeartbeat, FaUserCircle } from "react-icons/fa";
-import Pagination from "../../../shared/Pagination";
-import ResultsCount from "../../../shared/ResultsCount";
+import Pagination from "../../../../shared/Pagination";
+import ResultsCount from "../../../../shared/ResultsCount";
+import AddUserModal from "./AddUserModal/AddUserModal";
+
 
 const UsersManagement = () => {
   const { axiosInstance } = useAxiosPublic();
   const token = localStorage.getItem("auth_token");
 
   // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [activeTab, setActiveTab] = useState("all"); // "all", "donors", "hospitals", "requesters", "blood_banks", "admins"
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [activeTab, setActiveTab] = useState("all");
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedRole, setSelectedRole] = useState("");
   const [selectedVerification, setSelectedVerification] = useState("");
 
   // Role colors and styles
   const roleConfig = {
-    donor: { color: "badge-success", icon: FaHeartbeat, label: "Donor" },
+    admin: { color: "badge-error", icon: FiShield, label: "Admin" },
     hospital: { color: "badge-info", icon: FiMapPin, label: "Hospital" },
+    donor: { color: "badge-success", icon: FaHeartbeat, label: "Donor" },
+    super_admin: { color: "badge-error", icon: FiShield, label: "Super Admin" },
     requester: { color: "badge-warning", icon: FiUserCheck, label: "Requester" },
     blood_bank: { color: "badge-secondary", icon: FiDroplet, label: "Blood Bank" },
-    admin: { color: "badge-error", icon: FiShield, label: "Admin" },
-    super_admin: { color: "badge-error", icon: FiShield, label: "Super Admin" },
   };
 
   // 🔹 Fetch All Users
@@ -200,7 +195,7 @@ const UsersManagement = () => {
             <FiDownload size={16} />
             Export
           </button>
-          <button className="btn btn-error btn-sm gap-2">
+          <button onClick={() => document.getElementById('add_user_modal').showModal()} className="btn btn-error btn-sm gap-2">
             <FiUserPlus size={16} />
             Add User
           </button>
@@ -209,92 +204,101 @@ const UsersManagement = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {/* Total Users */}
         <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
           <div className="stat-figure text-error">
             <FiUsers size={24} />
           </div>
-          <div className="stat-title">Total Users</div>
-          <div className="stat-value text-3xl">{allUsers?.count || 0}</div>
-          <div className="stat-desc">Active accounts</div>
+          <p className="stat-title">Total Users</p>
+          <p className="stat-value text-3xl">{allUsers?.count || 0}</p>
+          <p className="stat-desc">Active accounts</p>
         </div>
 
+        {/* Donors */}
         <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
           <div className="stat-figure text-success">
             <FaHeartbeat size={24} />
           </div>
-          <div className="stat-title">Donors</div>
-          <div className="stat-value text-3xl">
-            {allUsers?.data?.filter(u => u.role === "donor").length || 0}
-          </div>
-          <div className="stat-desc">Ready to donate</div>
+          <p className="stat-title">Donors</p>
+          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "donor").length || 0}</p>
+          <p className="stat-desc">Ready to donate</p>
         </div>
 
+        {/* Hospitals */}
         <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
           <div className="stat-figure text-info">
             <FiMapPin size={24} />
           </div>
-          <div className="stat-title">Hospitals</div>
-          <div className="stat-value text-3xl">
-            {allUsers?.data?.filter(u => u.role === "hospital").length || 0}
-          </div>
-          <div className="stat-desc">Medical facilities</div>
+          <p className="stat-title">Hospitals</p>
+          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "hospital").length || 0}</p>
+          <p className="stat-desc">Medical facilities</p>
         </div>
 
+        {/* Requesters */}
         <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
           <div className="stat-figure text-warning">
             <FiUserCheck size={24} />
           </div>
-          <div className="stat-title">Requesters</div>
-          <div className="stat-value text-3xl">
-            {allUsers?.data?.filter(u => u.role === "requester").length || 0}
-          </div>
-          <div className="stat-desc">Active requests</div>
+          <p className="stat-title">Requesters</p>
+          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "requester").length || 0}</p>
+          <p className="stat-desc">Active requests</p>
         </div>
 
+        {/* Verified */}
         <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
           <div className="stat-figure text-success">
             <FiCheckCircle size={24} />
           </div>
-          <div className="stat-title">Verified</div>
-          <div className="stat-value text-3xl">
-            {allUsers?.data?.filter(u => u.verification?.isEmailVerified).length || 0}
-          </div>
-          <div className="stat-desc">Email verified</div>
+          <p className="stat-title">Verified</p>
+          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.verification?.isEmailVerified).length || 0}</p>
+          <p className="stat-desc">Email verified</p>
         </div>
       </div>
 
       {/* Tabs */}
       <div className="tabs tabs-boxed bg-base-100 p-1 border border-base-300">
+
+        {/* All Tab button */}
         <button
           className={`tab tab-sm ${activeTab === "all" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("all")}
         >
           All Users
         </button>
+
+        {/* Donor Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "donors" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("donors")}
         >
           Donors
         </button>
+
+        {/* Hospital Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "hospitals" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("hospitals")}
         >
           Hospitals
         </button>
+
+        {/* Requester Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "requesters" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("requesters")}
         >
           Requesters
         </button>
+
+        {/* Blood Bank Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "blood_banks" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("blood_banks")}
         >
           Blood Banks
         </button>
+
+        {/* Admin Tab buttons */}
         <button
           className={`tab tab-sm ${activeTab === "admins" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("admins")}
@@ -367,17 +371,19 @@ const UsersManagement = () => {
 
       {/* Results Count */}
       <ResultsCount
-        filteredUsers={filteredUsers}
-        itemsPerPage={itemsPerPage}
-        setItemsPerPage={setItemsPerPage}
-        startIndex={startIndex}
         endIndex={endIndex}
+        startIndex={startIndex}
+        itemsPerPage={itemsPerPage}
+        filteredUsers={filteredUsers}
         setCurrentPage={setCurrentPage}
+        setItemsPerPage={setItemsPerPage}
       />
 
       {/* Users Table */}
       <div className="overflow-x-auto bg-base-100 rounded-lg shadow-sm border border-base-300">
         <table className="table table-zebra w-full">
+
+          {/* Table Header */}
           <thead>
             <tr className="bg-base-200">
               <th className="w-12">#</th>
@@ -391,13 +397,19 @@ const UsersManagement = () => {
               <th className="text-center">Actions</th>
             </tr>
           </thead>
+
+          {/* Table Body */}
           <tbody>
             {paginatedUsers.length > 0 ? (
               paginatedUsers.map((user, index) => {
                 const RoleIcon = roleConfig[user.role]?.icon || FiUserCheck;
                 return (
                   <tr key={user._id} className="hover">
+
+                    {/* User Index */}
                     <td className="font-medium">{startIndex + index + 1}</td>
+
+                    {/* User Details */}
                     <td>
                       <div className="flex items-center gap-3">
                         <div className="avatar">
@@ -423,12 +435,16 @@ const UsersManagement = () => {
                         </div>
                       </div>
                     </td>
+
+                    {/* User Role */}
                     <td>
                       <div className={`badge ${roleConfig[user.role]?.color || "badge-ghost"} gap-1`}>
                         <RoleIcon size={12} />
                         {roleConfig[user.role]?.label || user.role}
                       </div>
                     </td>
+
+                    {/* User Contact */}
                     <td>
                       <div className="space-y-1">
                         <div className="flex items-center gap-1 text-sm">
@@ -443,6 +459,8 @@ const UsersManagement = () => {
                         )}
                       </div>
                     </td>
+
+                    {/* User Blood Group */}
                     <td>
                       {user.profile?.bloodGroup ? (
                         <div className="font-semibold text-error">
@@ -452,6 +470,8 @@ const UsersManagement = () => {
                         <span className="text-base-content/50">—</span>
                       )}
                     </td>
+
+                    {/* User Location */}
                     <td>
                       {user.address?.city ? (
                         <div className="flex items-center gap-1 text-sm">
@@ -462,6 +482,8 @@ const UsersManagement = () => {
                         <span className="text-base-content/50">—</span>
                       )}
                     </td>
+
+                    {/* User Status */}
                     <td>
                       <div className="space-y-1">
                         {getVerificationBadge(user)}
@@ -473,20 +495,29 @@ const UsersManagement = () => {
                         )}
                       </div>
                     </td>
+
+                    {/* User Joined */}
                     <td>
                       <div className="flex items-center gap-1 text-sm">
                         <FiCalendar size={12} className="text-base-content/50" />
                         <span>{formatDate(user.createdAt)}</span>
                       </div>
                     </td>
+
+                    {/* Actions */}
                     <td>
                       <div className="flex justify-center gap-1">
+                        {/* View */}
                         <button className="btn btn-ghost btn-sm btn-square tooltip" data-tip="View">
                           <FiEye size={16} />
                         </button>
+
+                        {/* Edit */}
                         <button className="btn btn-ghost btn-sm btn-square tooltip" data-tip="Edit">
                           <FiEdit2 size={16} />
                         </button>
+
+                        {/* Delete */}
                         <button className="btn btn-ghost btn-sm btn-square text-error tooltip" data-tip="Delete">
                           <FiTrash2 size={16} />
                         </button>
@@ -520,6 +551,18 @@ const UsersManagement = () => {
           onPageChange={handlePageChange}
         />
       )}
+
+      {/* Add User Modal */}
+      <dialog id="add_user_modal" className="modal">
+
+        {/* Add User Modal */}
+        <AddUserModal refreshUsers={() => usersRefetch()} />
+
+        {/* Close Modal */}
+        <form method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 };

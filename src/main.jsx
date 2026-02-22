@@ -27,7 +27,8 @@ import RequireRole from './middleware/RequireRole.jsx';
 
 // Backend Layout
 import Backend_Layout from './Pages/backend/Layout/Backend_Layout.jsx';
-import UsersManagement from './Pages/backend/Admin/UsersManagement.jsx';
+import UsersManagement from './Pages/backend/Admin/UsersManagement/UsersManagement.jsx';
+
 
 // Create Query Client
 const queryClient = new QueryClient();
