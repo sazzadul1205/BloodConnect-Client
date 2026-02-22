@@ -119,15 +119,14 @@ const Backend_Layout = ({ userType }) => {
   }, []);
 
   return (
-    <div className="flex flex-col lg:flex-row bg-base-200 min-h-screen">
-
-      {/* ================= Desktop Sidebar ================= */}
+    <div className="flex h-screen overflow-hidden bg-base-200">
+      {/* ================= Desktop Sidebar (Fixed) ================= */}
       <aside
-        className={`hidden lg:flex flex-col bg-base-100 border-r border-base-300
-          ${isCollapsed ? "w-20" : "w-72"} transition-all duration-300 shadow-lg`}
+        className={`hidden lg:flex flex-col bg-base-100 border-r border-base-300 h-screen fixed left-0 top-0
+          ${isCollapsed ? "w-20" : "w-72"} transition-all duration-300 shadow-lg z-30`}
       >
         {/* Logo + Collapse */}
-        <div className="h-16 px-4 border-b border-red-500 flex items-center gap-3">
+        <div className="h-16 px-4 border-b border-red-500 flex items-center gap-3 shrink-0">
           <div className="bg-error/10 p-2 rounded-xl">
             <FaHeartbeat className="text-error text-xl" />
           </div>
@@ -140,26 +139,28 @@ const Backend_Layout = ({ userType }) => {
           </button>
         </div>
 
-        {/* Sidebar Links */}
-        <ul className="p-3 flex-1 space-y-1">
-          {navigation.map((item) => (
-            <li key={item.name}>
-              <NavLink
-                to={item.path}
-                className={({ isActive }) =>
-                  `flex items-center ${isCollapsed ? "justify-center" : "gap-3"} px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
-                  }`
-                }
-              >
-                <item.icon size={18} />
-                {!isCollapsed && <span className="font-medium">{item.name}</span>}
-              </NavLink>
-            </li>
-          ))}
-        </ul>
+        {/* Sidebar Links - Scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          <ul className="p-3 space-y-1">
+            {navigation.map((item) => (
+              <li key={item.name}>
+                <NavLink
+                  to={item.path}
+                  className={({ isActive }) =>
+                    `flex items-center ${isCollapsed ? "justify-center" : "gap-3"} px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
+                    }`
+                  }
+                >
+                  <item.icon size={18} />
+                  {!isCollapsed && <span className="font-medium">{item.name}</span>}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-        {/* Logout */}
-        <div className="p-3 border-t border-red-500">
+        {/* Logout - Fixed at bottom */}
+        <div className="p-3 border-t border-red-500 shrink-0">
           <button
             onClick={logout}
             className={`flex items-center w-full ${isCollapsed ? "justify-center" : "gap-3"} px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200`}
@@ -177,7 +178,7 @@ const Backend_Layout = ({ userType }) => {
             className="fixed inset-y-0 left-0 w-72 bg-base-100 p-4 flex flex-col shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex justify-between items-center mb-6 shrink-0">
               <div className="flex items-center gap-2">
                 <FaHeartbeat className="text-error text-xl" />
                 <h1 className="text-xl font-bold">BloodConnect</h1>
@@ -187,25 +188,27 @@ const Backend_Layout = ({ userType }) => {
               </button>
             </div>
 
-            <ul className="flex-1 space-y-1">
-              {navigation.map((item) => (
-                <li key={item.name}>
-                  <NavLink
-                    to={item.path}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
-                      }`
-                    }
-                  >
-                    <item.icon size={18} />
-                    <span className="font-medium">{item.name}</span>
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
+            <div className="flex-1 overflow-y-auto">
+              <ul className="space-y-1">
+                {navigation.map((item) => (
+                  <li key={item.name}>
+                    <NavLink
+                      to={item.path}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
+                        }`
+                      }
+                    >
+                      <item.icon size={18} />
+                      <span className="font-medium">{item.name}</span>
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-            <div>
+            <div className="shrink-0 mt-4">
               <button
                 onClick={logout}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200"
@@ -218,11 +221,16 @@ const Backend_Layout = ({ userType }) => {
         </div>
       )}
 
-      {/* ================= Main Content ================= */}
-      <div className="flex-1 flex flex-col">
-
-        {/* Top Navbar */}
-        <div className="navbar bg-base-100 border-b border-base-300 px-2 h-16 flex justify-between lg:justify-end">
+      {/* ================= Main Content Area (Scrollable) ================= */}
+      <div
+        className="flex-1 flex flex-col h-screen overflow-y-auto"
+        style={{
+          marginLeft: isCollapsed ? '5rem' : '18rem', // 5rem = w-20 (80px), 18rem = w-72 (288px)
+          transition: 'margin-left 300ms'
+        }}
+      >
+        {/* Top Navbar - Fixed at top of content area */}
+        <div className="navbar bg-base-100 border-b border-base-300 px-2 h-16 flex justify-between lg:justify-end sticky top-0 z-20">
           {/* Mobile Hamburger Button */}
           <div className="flex items-center gap-2 lg:hidden">
             <button
@@ -262,9 +270,9 @@ const Backend_Layout = ({ userType }) => {
           </div>
         </div>
 
-        {/* Page Content */}
+        {/* Page Content - Scrolls with main container */}
         <div className="p-4 sm:p-6 flex-1">
-          <div className="bg-base-100 rounded-2xl shadow-sm border border-base-300 p-6 min-h-[75vh]">
+          <div className="bg-base-100 rounded-2xl shadow-sm border border-base-300 p-6">
             <Outlet />
           </div>
         </div>
@@ -287,7 +295,6 @@ const Backend_Layout = ({ userType }) => {
           </NavLink>
         ))}
       </div>
-
     </div>
   );
 };
