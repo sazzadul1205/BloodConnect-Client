@@ -28,6 +28,7 @@ import RequireRole from './middleware/RequireRole.jsx';
 // Backend Layout
 import Backend_Layout from './Pages/backend/Layout/Backend_Layout.jsx';
 import UsersManagement from './Pages/backend/Admin/UsersManagement/UsersManagement.jsx';
+import AuditLogs from './Pages/backend/Admin/AuditLogs/AuditLogs.jsx';
 
 
 // Create Query Client
@@ -91,6 +92,7 @@ createRoot(document.getElementById('root')).render(
               <Route element={<Backend_Layout userType="admin" />}>
 
                 <Route path="/admin/dashboard" element={<h1 className='text-black'>Blood Bank Dashboard</h1>} />
+                <Route path="/admin/audit-logs" element={<AuditLogs />} />
                 <Route path="/admin/users-management" element={<UsersManagement />} />
               </Route>
             </Route>

@@ -1,9 +1,13 @@
+// Pages/backend/Admin/UsersManagement/UsersManagement.jsx
+
+// React
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import useAxiosPublic from "../../../../hooks/useAxiosPublic";
-import BloodLoader from "../../../../shared/BloodLoader";
-import ErrorState from "../../../../shared/ErrorState";
+
+// Sweet Alert
 import Swal from "sweetalert2";
+
+// Icons
 import {
   FiUsers,
   FiUserCheck,
@@ -24,12 +28,23 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import { FaHeartbeat, FaUserCircle } from "react-icons/fa";
+
+// Hooks
+import useAxiosPublic from "../../../../hooks/useAxiosPublic";
+
+// Shared
 import Pagination from "../../../../shared/Pagination";
+import ErrorState from "../../../../shared/ErrorState";
+import BloodLoader from "../../../../shared/BloodLoader";
 import ResultsCount from "../../../../shared/ResultsCount";
+
+// Services
+import { showExportOptions } from "./userExport";
+
+// Modals
 import AddUserModal from "./AddUserModal/AddUserModal";
 import EditUserModal from "./EditUserModal/EditUserModal";
 import ViewUserModal from "./ViewUserModal/ViewUserModal";
-import { showExportOptions } from "./userExport";
 
 const UsersManagement = () => {
   const { axiosInstance } = useAxiosPublic();
@@ -39,12 +54,12 @@ const UsersManagement = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("all");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [selectedRole, setSelectedRole] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedVerification, setSelectedVerification] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
 
   // Role colors and styles
   const roleConfig = {
