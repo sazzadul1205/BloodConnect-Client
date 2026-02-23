@@ -1,6 +1,7 @@
 // React
-import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { useQuery } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
 
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -28,9 +29,8 @@ import {
 } from "react-icons/fa";
 
 // Hooks
-import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
-import { useQuery } from "@tanstack/react-query";
 import BloodLoader from "../../../../../shared/BloodLoader";
+import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 
 const EditBloodBankModal = ({ bankId, onClose, refreshBanks }) => {
   const { axiosInstance } = useAxiosPublic();

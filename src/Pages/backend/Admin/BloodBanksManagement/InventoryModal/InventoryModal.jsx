@@ -1,17 +1,26 @@
 // Pages/backend/Admin/BloodBanksManagement/InventoryModal.jsx
 
-import React, { useState, useEffect } from "react";
-import { FiX, FiSave, FiRefreshCw } from "react-icons/fi";
-import Swal from "sweetalert2";
-import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
-
+// React
 import { useQuery } from "@tanstack/react-query";
+import React, { useState, useEffect } from "react";
+
+// Icons
+import { FiX, FiSave, FiRefreshCw } from "react-icons/fi";
+
+// sweetalert
+import Swal from "sweetalert2";
+
+// Hooks
+import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 
 const InventoryModal = ({ bankId, onClose, refreshBanks }) => {
   const { axiosInstance } = useAxiosPublic();
   const token = localStorage.getItem("auth_token");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // States
+  const [apiError, setApiError] = useState("");
   const [inventory, setInventory] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch bank details
   const { data: bankData } = useQuery({
@@ -72,8 +81,8 @@ const InventoryModal = ({ bankId, onClose, refreshBanks }) => {
 
   // Handle bulk update
   const handleSubmit = async (e) => {
+    setApiError("");
     e.preventDefault();
-
     setIsSubmitting(true);
 
     try {
@@ -91,26 +100,26 @@ const InventoryModal = ({ bankId, onClose, refreshBanks }) => {
       );
 
       if (response.data.success) {
+        onClose();
+        refreshBanks();
+
         await Swal.fire({
           icon: "success",
           title: "Success!",
           text: "Inventory updated successfully",
-          timer: 2000,
-          showConfirmButton: false,
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            title: "text-lg font-bold text-error",
+            content: "text-base text-base-content/80",
+            confirmButton: "btn btn-sm btn-error",
+          },
+          buttonsStyling: false,
         });
 
-        refreshBanks();
-        onClose();
       }
     } catch (error) {
       console.error("Error updating inventory:", error);
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error.response?.data?.error || "Failed to update inventory",
-        timer: 3000,
-        showConfirmButton: true,
-      });
+      setApiError(error.response?.data?.error || "Failed to update inventory");
     } finally {
       setIsSubmitting(false);
     }
@@ -149,12 +158,25 @@ const InventoryModal = ({ bankId, onClose, refreshBanks }) => {
         </div>
       )}
 
+      {/* Error Alert */}
+      {apiError && (
+        <div className="px-6 pt-4">
+          <div className="alert alert-error shadow-lg">
+            <div className="flex items-center gap-2">
+              <FaExclamationCircle size={20} />
+              <span>{apiError}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Form */}
       <form onSubmit={handleSubmit} className="py-4 max-h-[70vh] overflow-y-auto">
         <div className="space-y-6">
           {/* Inventory Table */}
           <div className="overflow-x-auto">
             <table className="table table-zebra w-full">
+              {/* Table Header */}
               <thead>
                 <tr className="bg-base-200">
                   <th>Blood Type</th>
@@ -174,6 +196,8 @@ const InventoryModal = ({ bankId, onClose, refreshBanks }) => {
                   <th></th>
                 </tr>
               </thead>
+
+              {/* Table Body */}
               <tbody>
                 {inventory.map((item) => {
                   const status = item.units <= item.threshold
