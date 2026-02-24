@@ -4,6 +4,9 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+// eslint-disable-next-line no-unused-vars
+import { motion} from "framer-motion";
+
 // Sweet Alert
 import Swal from "sweetalert2";
 
@@ -310,10 +313,17 @@ const UsersManagement = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Header Section with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+      >
+        {/* Header copy: communicates context and purpose of user management dashboard. */}
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
+            {/* Visual identity icon for user management system. */}
             <FiUsers className="text-error" />
             Users Management
           </h2>
@@ -322,8 +332,9 @@ const UsersManagement = () => {
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: export and add user utilities. */}
         <div className="flex gap-2">
+          {/* Export Button with Count: exports current filtered user set. */}
           <button
             onClick={handleExport}
             className="btn btn-outline btn-sm gap-2"
@@ -341,6 +352,8 @@ const UsersManagement = () => {
               </>
             )}
           </button>
+
+          {/* Add User Button: opens modal for new user creation. */}
           <button
             onClick={() => document.getElementById('add_user_modal')?.showModal()}
             className="btn btn-error btn-sm gap-2"
@@ -349,63 +362,116 @@ const UsersManagement = () => {
             Add User
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Users */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+      {/* Stats Cards with Staggered Fade In */}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: { opacity: 0 },
+          visible: {
+            opacity: 1,
+            transition: {
+              staggerChildren: 0.1 // Each card fades in sequentially with 0.1s delay
+            }
+          }
+        }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"
+      >
+        {/* Card 1: Total Users - overall account count. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-error">
             <FiUsers size={24} />
           </div>
           <p className="stat-title">Total Users</p>
           <p className="stat-value text-3xl">{allUsers?.count || 0}</p>
           <p className="stat-desc">Active accounts</p>
-        </div>
+        </motion.div>
 
-        {/* Donors */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 2: Donors - blood donor count with success color. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-success">
             <FaHeartbeat size={24} />
           </div>
           <p className="stat-title">Donors</p>
           <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "donor").length || 0}</p>
           <p className="stat-desc">Ready to donate</p>
-        </div>
+        </motion.div>
 
-        {/* Hospitals */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 3: Hospitals - medical facilities count. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-info">
             <FiMapPin size={24} />
           </div>
           <p className="stat-title">Hospitals</p>
           <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "hospital").length || 0}</p>
           <p className="stat-desc">Medical facilities</p>
-        </div>
+        </motion.div>
 
-        {/* Requesters */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 4: Requesters - users requesting blood. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-warning">
             <FiUserCheck size={24} />
           </div>
           <p className="stat-title">Requesters</p>
           <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "requester").length || 0}</p>
           <p className="stat-desc">Active requests</p>
-        </div>
+        </motion.div>
 
-        {/* Verified */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 5: Verified - email-verified users count. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-success">
             <FiCheckCircle size={24} />
           </div>
           <p className="stat-title">Verified</p>
           <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.verification?.isEmailVerified).length || 0}</p>
           <p className="stat-desc">Email verified</p>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      {/* Tabs */}
-      <div className="tabs tabs-boxed bg-base-100 p-1 border border-base-300">
+      {/* Tabs with Fade In - role-based filtering navigation */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15 }}
+        className="tabs tabs-boxed bg-base-100 p-1 border border-base-300 overflow-x-auto flex-nowrap"
+      >
         <button
           className={`tab tab-sm ${activeTab === "all" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("all")}
@@ -442,12 +508,17 @@ const UsersManagement = () => {
         >
           Admins
         </button>
-      </div>
+      </motion.div>
 
-      {/* Filters Section */}
-      <div className="bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+      {/* Filters Section with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4"
+      >
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
+          {/* Search input: free-text search across user fields. */}
           <div className="flex-1">
             <div className="form-control">
               <div className="input-group">
@@ -462,7 +533,7 @@ const UsersManagement = () => {
             </div>
           </div>
 
-          {/* Role Filter */}
+          {/* Role Filter: dropdown for role-based filtering. */}
           <div className="w-full lg:w-48">
             <select
               className="select select-bordered w-full"
@@ -478,7 +549,7 @@ const UsersManagement = () => {
             </select>
           </div>
 
-          {/* Verification Filter */}
+          {/* Verification Filter: filters by email verification status. */}
           <div className="w-full lg:w-48">
             <select
               className="select select-bordered w-full"
@@ -491,7 +562,7 @@ const UsersManagement = () => {
             </select>
           </div>
 
-          {/* Reset Filters */}
+          {/* Reset Filters: clears all filter inputs. */}
           <button
             className="btn btn-outline btn-square"
             onClick={() => {
@@ -504,22 +575,33 @@ const UsersManagement = () => {
             <FiRefreshCw size={18} />
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Results Count */}
-      <ResultsCount
-        endIndex={endIndex}
-        startIndex={startIndex}
-        itemsPerPage={itemsPerPage}
-        filteredUsers={filteredUsers}
-        setCurrentPage={setCurrentPage}
-        setItemsPerPage={setItemsPerPage}
-      />
+      {/* Results Count with Fade In: shows current range and total items. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.25 }}
+      >
+        <ResultsCount
+          endIndex={endIndex}
+          startIndex={startIndex}
+          itemsPerPage={itemsPerPage}
+          filteredUsers={filteredUsers}
+          setCurrentPage={setCurrentPage}
+          setItemsPerPage={setItemsPerPage}
+        />
+      </motion.div>
 
-      {/* Content */}
-      <div className="overflow-x-auto bg-base-100 rounded-lg shadow-sm border border-base-300">
+      {/* Main Users Table with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="overflow-x-auto bg-base-100 rounded-lg shadow-lg border border-base-300"
+      >
         <table className="table table-zebra w-full">
-          {/* Table Header */}
+          {/* Table Header: column definitions for user data. */}
           <thead>
             <tr className="bg-base-200">
               <th className="w-12">#</th>
@@ -534,7 +616,7 @@ const UsersManagement = () => {
             </tr>
           </thead>
 
-          {/* Table Body */}
+          {/* Table Body with staggered row animations */}
           <tbody>
             {paginatedUsers.length > 0 ? (
               paginatedUsers.map((user, index) => {
@@ -542,11 +624,17 @@ const UsersManagement = () => {
                 const userName = user.profile?.fullName || user.email || "Unknown User";
 
                 return (
-                  <tr key={user._id} className="hover">
-                    {/* User Index */}
+                  <motion.tr
+                    key={user._id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: 0.35 + index * 0.02 }}
+                    className="hover"
+                  >
+                    {/* User Index: sequential number with pagination offset. */}
                     <td className="font-medium">{startIndex + index + 1}</td>
 
-                    {/* User Details */}
+                    {/* User Details: avatar + name + username */}
                     <td>
                       <div className="flex items-center gap-3">
                         <div className="avatar">
@@ -573,7 +661,7 @@ const UsersManagement = () => {
                       </div>
                     </td>
 
-                    {/* User Role */}
+                    {/* User Role: color-coded badge with icon */}
                     <td>
                       <div className={`badge ${roleConfig[user.role]?.color || "badge-ghost"} gap-1`}>
                         <RoleIcon size={12} />
@@ -581,7 +669,7 @@ const UsersManagement = () => {
                       </div>
                     </td>
 
-                    {/* User Contact */}
+                    {/* User Contact: email and phone with icons */}
                     <td>
                       <div className="space-y-1">
                         <div className="flex items-center gap-1 text-sm">
@@ -597,7 +685,7 @@ const UsersManagement = () => {
                       </div>
                     </td>
 
-                    {/* User Blood Group */}
+                    {/* User Blood Group: highlighted in error color */}
                     <td>
                       {user.profile?.bloodGroup ? (
                         <div className="font-semibold text-error">
@@ -608,7 +696,7 @@ const UsersManagement = () => {
                       )}
                     </td>
 
-                    {/* User Location */}
+                    {/* User Location: city with map pin icon */}
                     <td>
                       {user.address?.city ? (
                         <div className="flex items-center gap-1 text-sm">
@@ -620,7 +708,7 @@ const UsersManagement = () => {
                       )}
                     </td>
 
-                    {/* User Status */}
+                    {/* User Status: verification badge + deletion indicator */}
                     <td>
                       <div className="space-y-1">
                         {getVerificationBadge(user)}
@@ -633,7 +721,7 @@ const UsersManagement = () => {
                       </div>
                     </td>
 
-                    {/* User Joined */}
+                    {/* User Joined: creation date formatted */}
                     <td>
                       <div className="flex items-center gap-1 text-sm">
                         <FiCalendar size={12} className="text-base-content/50" />
@@ -641,10 +729,10 @@ const UsersManagement = () => {
                       </div>
                     </td>
 
-                    {/* Actions */}
+                    {/* Actions: view, edit, delete buttons */}
                     <td>
                       <div className="flex justify-center gap-1">
-                        {/* View */}
+                        {/* View button - opens detail modal */}
                         <button
                           onClick={() => {
                             setSelectedUserId(user?._id);
@@ -657,7 +745,7 @@ const UsersManagement = () => {
                           <FiEye size={16} />
                         </button>
 
-                        {/* Edit */}
+                        {/* Edit button - opens edit modal */}
                         <button
                           onClick={() => {
                             setSelectedUserId(user?._id);
@@ -670,7 +758,7 @@ const UsersManagement = () => {
                           <FiEdit2 size={16} />
                         </button>
 
-                        {/* Delete */}
+                        {/* Delete button - triggers delete confirmation */}
                         <button
                           onClick={() => handleDeleteUser(user._id, userName)}
                           className="btn btn-ghost btn-sm btn-square text-error tooltip"
@@ -681,11 +769,16 @@ const UsersManagement = () => {
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 );
               })
             ) : (
-              <tr>
+              // Empty state with animation
+              <motion.tr
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.4 }}
+              >
                 <td colSpan={9} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <FiUsers size={48} className="text-base-content/30" />
@@ -695,22 +788,28 @@ const UsersManagement = () => {
                     </p>
                   </div>
                 </td>
-              </tr>
+              </motion.tr>
             )}
           </tbody>
         </table>
-      </div>
+      </motion.div>
 
-      {/* Pagination */}
+      {/* Pagination with Fade In */}
       {filteredUsers.length > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+        >
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </motion.div>
       )}
 
-      {/* Add User Modal */}
+      {/* Add User Modal - dialog with backdrop click close */}
       <dialog id="add_user_modal" className="modal">
         <AddUserModal
           onClose={() => CloseModal()}
@@ -721,7 +820,7 @@ const UsersManagement = () => {
         </form>
       </dialog>
 
-      {/* Edit User Modal */}
+      {/* Edit User Modal - dialog with backdrop click close */}
       <dialog id="edit_user_modal" className="modal">
         <EditUserModal
           userId={selectedUserId}
@@ -733,7 +832,7 @@ const UsersManagement = () => {
         </form>
       </dialog>
 
-      {/* View User Modal */}
+      {/* View User Modal - dialog with backdrop click close */}
       <dialog id="view_user_modal" className="modal">
         <ViewUserModal
           userId={selectedUserId}

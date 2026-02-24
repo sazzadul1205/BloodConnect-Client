@@ -4,6 +4,9 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
+// eslint-disable-next-line no-unused-vars
+import { motion, AnimatePresence } from "framer-motion";
+
 // Sweet Alert
 import Swal from "sweetalert2";
 
@@ -107,6 +110,10 @@ const BloodBanksManagement = () => {
   // 🔹 Fetch Low Inventory Alerts
   const {
     data: lowInventoryData,
+    isLoading: loadingLowInventory,
+    isError: lowInventoryError,
+    error: lowInventoryErrorData,
+    refetch: refetchLowInventory,
   } = useQuery({
     queryKey: ["low-inventory-alerts"],
     queryFn: async () => {
@@ -395,32 +402,39 @@ const BloodBanksManagement = () => {
   // Close modals helper
   const CloseModal = () => {
     setSelectedBankId(null);
+    document.getElementById('staff_modal')?.close();
     document.getElementById('add_bank_modal')?.close();
     document.getElementById('view_bank_modal')?.close();
     document.getElementById('edit_bank_modal')?.close();
     document.getElementById('inventory_modal')?.close();
-    document.getElementById('staff_modal')?.close();
   };
 
   // Loading state
-  if (loadingBanks) return <BloodLoader />;
+  if (loadingBanks || loadingLowInventory) return <BloodLoader />;
 
-  // Error state
-  if (banksError) {
+  // Error state for blood banks
+  if (banksError || lowInventoryError) {
     return (
       <ErrorState
-        error={banksErrorData}
-        onRetry={() => refetchBanks()}
+        error={[banksErrorData, lowInventoryErrorData]}
+        onRetry={() => refetchBanks() && refetchLowInventory()}
       />
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* Header Section with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+      >
+        {/* Header copy: communicates context and purpose of blood bank management dashboard. */}
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
+            {/* Visual identity icon for blood bank management system. */}
             <FiHome className="text-error" />
             Blood Banks Management
           </h2>
@@ -429,8 +443,9 @@ const BloodBanksManagement = () => {
           </p>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons: low inventory toggle, export, and add bank utilities. */}
         <div className="flex gap-2">
+          {/* Low Inventory Toggle: filters view to show only banks with low stock. */}
           <button
             onClick={() => setShowLowInventory(!showLowInventory)}
             className={`btn btn-sm gap-2 ${showLowInventory ? 'btn-warning' : 'btn-outline'}`}
@@ -438,6 +453,8 @@ const BloodBanksManagement = () => {
             <FiAlertCircle size={16} />
             {showLowInventory ? 'Showing Low Inventory' : 'Show Low Inventory'}
           </button>
+
+          {/* Export Button with Count: exports current filtered bank set. */}
           <button
             onClick={handleExport}
             className="btn btn-outline btn-sm gap-2"
@@ -455,6 +472,8 @@ const BloodBanksManagement = () => {
               </>
             )}
           </button>
+
+          {/* Add Blood Bank Button: opens modal for new bank creation. */}
           <button
             onClick={() => document.getElementById('add_bank_modal')?.showModal()}
             className="btn btn-error btn-sm gap-2"
@@ -463,22 +482,49 @@ const BloodBanksManagement = () => {
             Add Blood Bank
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Total Banks */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+      {/* Stats Cards with Staggered Fade In */}
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{
+          hidden: { opacity: 0 },
+          visible: {
+            opacity: 1,
+            transition: {
+              staggerChildren: 0.1 // Each card fades in sequentially with 0.1s delay
+            }
+          }
+        }}
+        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"
+      >
+        {/* Card 1: Total Banks - overall facility count. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-error">
             <FiHome size={24} />
           </div>
           <p className="stat-title">Total Banks</p>
           <p className="stat-value text-3xl">{bloodBanksData?.count || 0}</p>
           <p className="stat-desc">Registered facilities</p>
-        </div>
+        </motion.div>
 
-        {/* Verified Banks */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 2: Verified Banks - approved facilities count. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-success">
             <FiCheckCircle size={24} />
           </div>
@@ -487,10 +533,17 @@ const BloodBanksManagement = () => {
             {bloodBanksData?.data?.filter(b => b.verification?.isVerified).length || 0}
           </p>
           <p className="stat-desc">Approved banks</p>
-        </div>
+        </motion.div>
 
-        {/* Total Inventory */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 3: Total Inventory - aggregate blood units across all banks. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-info">
             <FiDroplet size={24} />
           </div>
@@ -501,20 +554,34 @@ const BloodBanksManagement = () => {
             )}
           </p>
           <p className="stat-desc">Blood units available</p>
-        </div>
+        </motion.div>
 
-        {/* Low Inventory */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 4: Low Inventory - banks needing attention. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-warning">
             <FiAlertCircle size={24} />
           </div>
           <p className="stat-title">Low Inventory</p>
           <p className="stat-value text-3xl">{lowInventoryData?.count || 0}</p>
           <p className="stat-desc">Banks need attention</p>
-        </div>
+        </motion.div>
 
-        {/* Staff Count */}
-        <div className="stat bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+        {/* Card 5: Staff Count - total healthcare workers across banks. */}
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 20 },
+            visible: { opacity: 1, y: 0 }
+          }}
+          transition={{ duration: 0.4 }}
+          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+        >
           <div className="stat-figure text-secondary">
             <FiUsers size={24} />
           </div>
@@ -523,13 +590,18 @@ const BloodBanksManagement = () => {
             {bloodBanksData?.data?.reduce((sum, bank) => sum + (bank.staff?.length || 0), 0)}
           </p>
           <p className="stat-desc">Healthcare workers</p>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      {/* Filters Section */}
-      <div className="bg-base-100 rounded-lg shadow-sm border border-base-300 p-4">
+      {/* Filters Section with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15 }}
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4"
+      >
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
+          {/* Search input: free-text search across bank fields. */}
           <div className="flex-1">
             <div className="form-control">
               <input
@@ -542,7 +614,7 @@ const BloodBanksManagement = () => {
             </div>
           </div>
 
-          {/* Type Filter */}
+          {/* Type Filter: dropdown for bank type filtering. */}
           <div className="w-full lg:w-48">
             <select
               className="select select-bordered w-full"
@@ -557,7 +629,7 @@ const BloodBanksManagement = () => {
             </select>
           </div>
 
-          {/* City Filter */}
+          {/* City Filter: dropdown for geographic filtering. */}
           <div className="w-full lg:w-48">
             <select
               className="select select-bordered w-full"
@@ -571,7 +643,7 @@ const BloodBanksManagement = () => {
             </select>
           </div>
 
-          {/* Verification Filter */}
+          {/* Verification Filter: filters by verification status. */}
           <div className="w-full lg:w-48">
             <select
               className="select select-bordered w-full"
@@ -584,7 +656,7 @@ const BloodBanksManagement = () => {
             </select>
           </div>
 
-          {/* Reset Filters */}
+          {/* Reset Filters: clears all filter inputs. */}
           <button
             className="btn btn-outline btn-square"
             onClick={() => {
@@ -598,22 +670,33 @@ const BloodBanksManagement = () => {
             <FiRefreshCw size={18} />
           </button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Results Count */}
-      <ResultsCount
-        endIndex={endIndex}
-        startIndex={startIndex}
-        itemsPerPage={itemsPerPage}
-        filteredUsers={filteredBanks}
-        setCurrentPage={setCurrentPage}
-        setItemsPerPage={setItemsPerPage}
-      />
+      {/* Results Count with Fade In: shows current range and total items. */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        <ResultsCount
+          endIndex={endIndex}
+          startIndex={startIndex}
+          itemsPerPage={itemsPerPage}
+          filteredUsers={filteredBanks}
+          setCurrentPage={setCurrentPage}
+          setItemsPerPage={setItemsPerPage}
+        />
+      </motion.div>
 
-      {/* Content */}
-      <div className="overflow-x-auto bg-base-100 rounded-lg shadow-sm border border-base-300">
+      {/* Main Blood Banks Table with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.25 }}
+        className="overflow-x-auto bg-base-100 rounded-lg shadow-lg border border-base-300"
+      >
         <table className="table table-zebra w-full">
-          {/* Table Header */}
+          {/* Table Header: column definitions for blood bank data. */}
           <thead>
             <tr className="bg-base-200">
               <th className="w-12">#</th>
@@ -629,7 +712,7 @@ const BloodBanksManagement = () => {
             </tr>
           </thead>
 
-          {/* Table Body */}
+          {/* Table Body with staggered row animations */}
           <tbody>
             {paginatedBanks.length > 0 ? (
               paginatedBanks.map((bank, index) => {
@@ -638,11 +721,17 @@ const BloodBanksManagement = () => {
                 const lowInventoryItems = bank.inventory?.filter(item => item.units <= item.threshold) || [];
 
                 return (
-                  <tr key={bank._id} className="hover">
-                    {/* Index */}
+                  <motion.tr
+                    key={bank._id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.3, delay: 0.3 + index * 0.02 }}
+                    className="hover"
+                  >
+                    {/* Index: sequential number with pagination offset. */}
                     <td className="font-medium">{startIndex + index + 1}</td>
 
-                    {/* Blood Bank Details */}
+                    {/* Blood Bank Details: name + registration number with icon. */}
                     <td>
                       <div className="flex items-center gap-3">
                         <div className="avatar">
@@ -659,7 +748,7 @@ const BloodBanksManagement = () => {
                       </div>
                     </td>
 
-                    {/* Type */}
+                    {/* Type: color-coded badge with icon. */}
                     <td>
                       <div className={`badge ${bankTypeConfig[bank.type]?.color || "badge-ghost"} gap-1`}>
                         <TypeIcon size={12} />
@@ -667,7 +756,7 @@ const BloodBanksManagement = () => {
                       </div>
                     </td>
 
-                    {/* Contact */}
+                    {/* Contact: phone and email with icons. */}
                     <td>
                       <div className="space-y-1">
                         <div className="flex items-center gap-1 text-sm">
@@ -683,7 +772,7 @@ const BloodBanksManagement = () => {
                       </div>
                     </td>
 
-                    {/* Location */}
+                    {/* Location: city and state with map pin. */}
                     <td>
                       <div className="flex items-center gap-1 text-sm">
                         <FiMapPin size={12} className="text-base-content/50" />
@@ -693,7 +782,7 @@ const BloodBanksManagement = () => {
                       </div>
                     </td>
 
-                    {/* Inventory */}
+                    {/* Inventory: status badge + low inventory indicators. */}
                     <td>
                       <div className="space-y-1">
                         <div className={`badge ${inventoryStatus.color} gap-1`}>
@@ -708,14 +797,14 @@ const BloodBanksManagement = () => {
                       </div>
                     </td>
 
-                    {/* Status */}
+                    {/* Status: verification badge. */}
                     <td>
                       <div className="space-y-1">
                         {getVerificationBadge(bank)}
                       </div>
                     </td>
 
-                    {/* Staff */}
+                    {/* Staff: staff count with icon. */}
                     <td>
                       <div className="flex items-center gap-1 text-sm">
                         <FiUsers size={12} className="text-base-content/50" />
@@ -723,7 +812,7 @@ const BloodBanksManagement = () => {
                       </div>
                     </td>
 
-                    {/* Registered Date */}
+                    {/* Registered Date: creation date formatted. */}
                     <td>
                       <div className="flex items-center gap-1 text-sm">
                         <FiCalendar size={12} className="text-base-content/50" />
@@ -731,10 +820,10 @@ const BloodBanksManagement = () => {
                       </div>
                     </td>
 
-                    {/* Actions */}
+                    {/* Actions: comprehensive action buttons with tooltips */}
                     <td>
                       <div className="flex justify-center gap-1">
-                        {/* View */}
+                        {/* View button - opens detail modal */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
@@ -746,7 +835,7 @@ const BloodBanksManagement = () => {
                           <FiEye size={16} />
                         </button>
 
-                        {/* Inventory */}
+                        {/* Inventory button - opens inventory management */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
@@ -758,7 +847,7 @@ const BloodBanksManagement = () => {
                           <FiDroplet size={16} />
                         </button>
 
-                        {/* Staff */}
+                        {/* Staff button - opens staff management */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
@@ -770,7 +859,7 @@ const BloodBanksManagement = () => {
                           <FiUsers size={16} />
                         </button>
 
-                        {/* Edit */}
+                        {/* Edit button - opens edit modal */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
@@ -782,7 +871,7 @@ const BloodBanksManagement = () => {
                           <FiEdit2 size={16} />
                         </button>
 
-                        {/* Verify/Un-verify */}
+                        {/* Verify/Un-verify toggle - conditional verification action */}
                         {!bank.verification?.isVerified ? (
                           <button
                             onClick={() => handleVerifyBank(bank._id, bank.name, true)}
@@ -801,7 +890,7 @@ const BloodBanksManagement = () => {
                           </button>
                         )}
 
-                        {/* Delete */}
+                        {/* Delete button - triggers delete confirmation */}
                         <button
                           onClick={() => handleDeleteBank(bank._id, bank.name)}
                           className="btn btn-ghost btn-sm btn-square text-error tooltip"
@@ -811,11 +900,16 @@ const BloodBanksManagement = () => {
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 );
               })
             ) : (
-              <tr>
+              // Empty state with animation
+              <motion.tr
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.35 }}
+              >
                 <td colSpan={10} className="text-center py-12">
                   <div className="flex flex-col items-center gap-2">
                     <FiHome size={48} className="text-base-content/30" />
@@ -825,28 +919,34 @@ const BloodBanksManagement = () => {
                     </p>
                   </div>
                 </td>
-              </tr>
+              </motion.tr>
             )}
           </tbody>
         </table>
-      </div>
+      </motion.div>
 
-      {/* Pagination */}
+      {/* Pagination with Fade In */}
       {filteredBanks.length > 0 && (
-        <Pagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+        >
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        </motion.div>
       )}
 
-      {/* Modals */}
+      {/* Modals - all with native dialog animations preserved */}
 
       {/* Add Blood Bank Modal */}
       <dialog id="add_bank_modal" className="modal">
         <AddBloodBankModal
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks()}
+          refreshBanks={() => refetchBanks() && refetchLowInventory()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
@@ -858,7 +958,7 @@ const BloodBanksManagement = () => {
         <EditBloodBankModal
           bankId={selectedBankId}
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks()}
+          refreshBanks={() => refetchBanks() && refetchLowInventory()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
@@ -881,7 +981,7 @@ const BloodBanksManagement = () => {
         <InventoryModal
           bankId={selectedBankId}
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks()}
+          refreshBanks={() => refetchBanks() && refetchLowInventory()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
@@ -893,7 +993,7 @@ const BloodBanksManagement = () => {
         <StaffModal
           bankId={selectedBankId}
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks()}
+          refreshBanks={() => refetchBanks() && refetchLowInventory()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>

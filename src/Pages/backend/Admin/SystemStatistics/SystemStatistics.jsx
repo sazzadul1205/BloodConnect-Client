@@ -40,7 +40,7 @@ import {
 } from "react-icons/fa";
 import { FaDroplet } from "react-icons/fa6";
 
-// Hooks
+// Recharts
 import {
   BarChart,
   Bar,
@@ -53,7 +53,11 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+
+// Hooks
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
+
+// Shared
 import BloodLoader from "../../../../shared/BloodLoader";
 
 const SystemStatistics = () => {
@@ -96,7 +100,10 @@ const SystemStatistics = () => {
   const {
     data: usersData,
     isLoading: usersLoading,
+    isError: usersError,
+    error: usersErrorData,
     refetch: refetchUsers,
+
   } = useQuery({
     queryKey: ["system-stats-users"],
     queryFn: async () => {
@@ -112,6 +119,8 @@ const SystemStatistics = () => {
   const {
     data: donorStats,
     isLoading: donorsLoading,
+    isError: donorsError,
+    error: donorsErrorData,
     refetch: refetchDonors,
   } = useQuery({
     queryKey: ["system-stats-donors"],
@@ -128,6 +137,8 @@ const SystemStatistics = () => {
   const {
     data: requestStats,
     isLoading: requestsLoading,
+    isError: requestsError,
+    error: requestsErrorData,
     refetch: refetchRequests,
   } = useQuery({
     queryKey: ["system-stats-requests"],
@@ -144,6 +155,8 @@ const SystemStatistics = () => {
   const {
     data: bankStats,
     isLoading: banksLoading,
+    isError: banksError,
+    error: banksErrorData,
     refetch: refetchBanks,
   } = useQuery({
     queryKey: ["system-stats-banks"],
@@ -160,6 +173,8 @@ const SystemStatistics = () => {
   const {
     data: eventStats,
     isLoading: eventsLoading,
+    isError: eventsError,
+    error: eventsErrorData,
     refetch: refetchEvents,
   } = useQuery({
     queryKey: ["system-stats-events"],
@@ -176,6 +191,8 @@ const SystemStatistics = () => {
   const {
     data: auditStats,
     isLoading: auditLoading,
+    isError: auditError,
+    error: auditErrorData,
     refetch: refetchAudit,
   } = useQuery({
     queryKey: ["system-stats-audit", dateRange],
@@ -192,6 +209,8 @@ const SystemStatistics = () => {
   const {
     data: dashboardSummary,
     isLoading: summaryLoading,
+    isError: summaryError,
+    error: summaryErrorData,
     refetch: refetchSummary,
   } = useQuery({
     queryKey: ["system-stats-dashboard"],
@@ -203,15 +222,6 @@ const SystemStatistics = () => {
     },
     enabled: !!token,
   });
-
-  const isLoading =
-    usersLoading ||
-    donorsLoading ||
-    requestsLoading ||
-    banksLoading ||
-    eventsLoading ||
-    auditLoading ||
-    summaryLoading;
 
   // Process data for charts
   const processedData = (() => {
@@ -367,8 +377,17 @@ const SystemStatistics = () => {
     return <FaEquals className="text-warning" />;
   };
 
-  if (isLoading) {
+  if (usersLoading || donorsLoading || requestsLoading || banksLoading || eventsLoading || auditLoading || summaryLoading) {
     return <BloodLoader />;
+  }
+
+  if (usersError || donorsError || requestsError || banksError || eventsError || auditError || summaryError) {
+    return (
+      <ErrorState
+        error={[usersErrorData || donorsErrorData || requestsErrorData || banksErrorData || eventsErrorData || auditErrorData || summaryErrorData]}
+        onRetry={() => handleRefresh()}
+      />
+    );
   }
 
   return (
