@@ -47,6 +47,7 @@ import ViewBloodBankModal from "./ViewBloodBankModal/ViewBloodBankModal";
 import InventoryModal from "./InventoryModal/InventoryModal";
 import StaffModal from "./StaffModal/StaffModal";
 import AddBloodBankModal from "./AddBloodBankModal/AddBloodBankModal";
+import { showExportOptions } from "./BloodBanksExport";
 
 const BloodBanksManagement = () => {
   const queryClient = useQueryClient();
@@ -56,7 +57,7 @@ const BloodBanksManagement = () => {
   const token = localStorage.getItem("auth_token");
 
   // Pagination and filter states
-  const [isExporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -247,8 +248,7 @@ const BloodBanksManagement = () => {
 
   // Handle export
   const handleExport = () => {
-    // Implement export functionality
-    console.log("Exporting banks:", filteredBanks);
+    showExportOptions(filteredBanks, setIsExporting);
   };
 
   // Handle delete bank

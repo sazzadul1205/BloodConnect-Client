@@ -77,6 +77,7 @@ const navigationConfig = {
 
   admin: [
     { name: "Admin Dashboard", path: "/admin/dashboard", icon: FiHome },
+    { name: "My Profile", path: "/admin/profile", icon: FiUser },
     { name: "Users Management", path: "/admin/users-management", icon: FiUsers },
     { name: "Audit Logs", path: "/admin/audit-logs", icon: FiClipboard },
     { name: "System Stats", path: "/admin/system-stats", icon: FiBarChart2 },

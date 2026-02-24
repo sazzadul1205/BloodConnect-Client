@@ -32,6 +32,8 @@ import AuditLogs from './Pages/backend/Admin/AuditLogs/AuditLogs.jsx';
 import BloodBanksManagement from './Pages/backend/Admin/BloodBanksManagement/BloodBanksManagement.jsx';
 import SystemStatistics from './Pages/backend/Admin/SystemStatistics/SystemStatistics.jsx';
 import AdminDashboard from './Pages/backend/Admin/AdminDashboard/AdminDashboard.jsx';
+import AdminSettings from './Pages/backend/Admin/AdminSettings/AdminSettings.jsx';
+import AdminProfile from './Pages/backend/Admin/AdminProfile/AdminProfile.jsx';
 
 
 // Create Query Client
@@ -99,6 +101,8 @@ createRoot(document.getElementById('root')).render(
                 <Route path="/admin/users-management" element={<UsersManagement />} />
                 <Route path="/admin/blood-banks-management" element={<BloodBanksManagement />} />
                 <Route path="/admin/system-stats" element={<SystemStatistics />} />
+                <Route path="/admin/profile" element={<AdminProfile />} />
+                <Route path="/admin/settings" element={<AdminSettings />} />
               </Route>
             </Route>
           </Route>
