@@ -8,7 +8,6 @@ import React, { useState, useEffect } from "react";
 import {
   FiHome,
   FiSettings,
-  FiMail,
   FiCalendar,
   FiLogOut,
   FiMaximize,
@@ -34,6 +33,7 @@ import useAuth from "../../../hooks/useAuth";
 
 // ThemeToggle
 import ThemeToggle from "../../Frontend/layout/ThemeToggle";
+import MessagesDropdown from "./components/MessagesDropdown";
 
 
 // Navigation configurations for different user types
@@ -141,14 +141,16 @@ const Backend_Layout = ({ userType }) => {
         </div>
 
         {/* Sidebar Links - Scrollable */}
-        <div className="flex-1 overflow-y-auto">
+        <div className={`flex-1 ${isCollapsed ? "overflow-visible" : "overflow-y-auto"}`}>
           <ul className="p-3 space-y-1">
             {navigation.map((item) => (
-              <li key={item.name}>
+              <li key={item.name} className={isCollapsed ? "overflow-visible" : ""}>
                 <NavLink
                   to={item.path}
+                  title={isCollapsed ? item.name : ""}
+                  data-tip={isCollapsed ? item.name : ""}
                   className={({ isActive }) =>
-                    `flex items-center ${isCollapsed ? "justify-center" : "gap-3"} px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
+                    `flex items-center ${isCollapsed ? "justify-center tooltip tooltip-right z-80 [&:before]:z-90 [&:after]:z-90" : "gap-3"} px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
                     }`
                   }
                 >
@@ -164,7 +166,9 @@ const Backend_Layout = ({ userType }) => {
         <div className="p-3 border-t border-red-500 shrink-0">
           <button
             onClick={logout}
-            className={`flex items-center w-full ${isCollapsed ? "justify-center" : "gap-3"} px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200`}
+            title={isCollapsed ? "Logout" : ""}
+            data-tip={isCollapsed ? "Logout" : ""}
+            className={`flex items-center w-full ${isCollapsed ? "justify-center tooltip tooltip-right z-80 [&:before]:z-90 [&:after]:z-90" : "gap-3"} px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200`}
           >
             <FiLogOut size={18} />
             {!isCollapsed && <span className="font-medium">Logout</span>}
@@ -257,9 +261,7 @@ const Backend_Layout = ({ userType }) => {
               {isFullscreen ? <FiMinimize size={18} /> : <FiMaximize size={18} />}
             </button>
 
-            <button className="btn btn-ghost btn-circle hover:bg-base-200">
-              <FiMail size={18} />
-            </button>
+            <MessagesDropdown user={user} />
 
             <div className="avatar">
               <div className="w-9 rounded-full bg-error text-white flex items-center justify-center font-semibold shadow">

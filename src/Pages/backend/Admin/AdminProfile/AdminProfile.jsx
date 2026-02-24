@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import Swal from "sweetalert2";
 
 // Icons
-import { FiUser, FiMapPin, FiSave, FiPhone, FiHeart, FiCalendar, FiDroplet } from "react-icons/fi";
+import { FiUser, FiMapPin, FiSave, FiPhone, FiHeart, FiCalendar, FiDroplet, FiKey } from "react-icons/fi";
 
 // Hooks
 import useAuth from "../../../../hooks/useAuth";
@@ -20,6 +20,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import ChangePasswordModal from "../UsersManagement/ChangePasswordModal/ChangePasswordModal";
 
 // Empty form template for initial state
 const emptyForm = {
@@ -166,6 +167,10 @@ const AdminProfile = () => {
     await updateMutation.mutateAsync(form);
   };
 
+  const closePasswordModal = () => {
+    document.getElementById("profile_change_password_modal")?.close();
+  };
+
   // User ID validation
   if (!userId) {
     return (
@@ -183,7 +188,7 @@ const AdminProfile = () => {
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-screen bg-base-200 p-6">
       {/* Header Section with Fade In */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -203,15 +208,27 @@ const AdminProfile = () => {
           </p>
         </div>
 
-        {/* Save Button: persists profile changes to backend. */}
-        <button
-          onClick={handleSubmit}
-          disabled={updateMutation.isPending}
-          className="btn btn-error btn-sm gap-2"
-        >
-          <FiSave size={16} />
-          {updateMutation.isPending ? "Saving..." : "Save Profile"}
-        </button>
+        {/* Header Actions: password change and profile save. */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              document.getElementById("profile_change_password_modal")?.showModal()
+            }
+            className="btn btn-outline btn-sm gap-2"
+          >
+            <FiKey size={16} />
+            Change Password
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={updateMutation.isPending}
+            className="btn btn-error btn-sm gap-2"
+          >
+            <FiSave size={16} />
+            {updateMutation.isPending ? "Saving..." : "Save Profile"}
+          </button>
+        </div>
       </motion.div>
 
       {/* Main Profile Form */}
@@ -487,6 +504,19 @@ const AdminProfile = () => {
           </button>
         </motion.div>
       </form>
+
+      {/* Change Password Modal */}
+      <dialog id="profile_change_password_modal" className="modal">
+        <ChangePasswordModal
+          userId={userId}
+          userName={form.fullName || user?.profile?.fullName || "My Account"}
+          onClose={closePasswordModal}
+          refreshUsers={() => refetch()}
+        />
+        <form method="dialog" className="modal-backdrop" onClick={closePasswordModal}>
+          <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 };

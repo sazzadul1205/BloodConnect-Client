@@ -238,7 +238,7 @@ const AdminSettings = () => {
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-screen bg-base-200 p-6">
       {/* Header Section with Fade In */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}

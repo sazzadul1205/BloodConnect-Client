@@ -392,7 +392,7 @@ const SystemStatistics = () => {
 
   return (
     // Page shell: full-height admin analytics surface with neutral background and consistent padding.
-    <div className="min-h-screen bg-base-200 p-6">
+    <div className="space-y-6 min-h-screen bg-base-200 p-6">
       {/* Header block: title/description on the left + controls on the right. */}
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
