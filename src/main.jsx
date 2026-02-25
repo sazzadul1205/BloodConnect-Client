@@ -39,6 +39,7 @@ import MyProfile from './Pages/backend/Donor/MyProfile/MyProfile.jsx';
 import MedicalInformation from './Pages/backend/Donor/MedicalInformation/MedicalInformation.jsx';
 import DonationHistory from './Pages/backend/Donor/DonationHistory/DonationHistory.jsx';
 import BloodRequests from './Pages/backend/Donor/BloodRequests/BloodRequests.jsx';
+import DonationEvents from './Pages/backend/Donor/DonationEvents/DonationEvents.jsx';
 
 
 // Create Query Client
@@ -75,6 +76,7 @@ createRoot(document.getElementById('root')).render(
                 <Route path="/donor/:donorId/medical" element={<MedicalInformation />} />
                 <Route path="/donor/history" element={<DonationHistory />} />
                 <Route path="/blood-requests" element={<BloodRequests />} />
+                <Route path="/donation-events" element={<DonationEvents />} />
               </Route>
             </Route>
 

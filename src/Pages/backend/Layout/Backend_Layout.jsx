@@ -43,11 +43,9 @@ const navigationConfig = {
     { name: "Donor Profile", path: "/donor/profile", icon: FiUser },
     { name: "My Profile", path: "/donor/my-profile", icon: FiUser },
     { name: "Medical Info", path: "/donor/:donorId/medical", icon: FiActivity },
-    { name: "Preferences", path: "/donor/preferences", icon: FiSliders },
     { name: "Donation History", path: "/donor/history", icon: FiClock },
     { name: "Blood Requests", path: "/blood-requests", icon: FiDroplet },
-    { name: "Events", path: "/donor/events", icon: FiCalendar },
-    { name: "Settings", path: "/donor/settings", icon: FiSettings },
+    { name: "Donation Events", path: "/donation-events", icon: FiCalendar },
   ],
 
   hospital: [
