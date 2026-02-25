@@ -35,6 +35,7 @@ import { FaHeartbeat, FaUserCircle } from "react-icons/fa";
 
 // Hooks
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
+import useAuth from "../../../../hooks/useAuth";
 
 // Shared
 import Pagination from "../../../../shared/Pagination";
@@ -53,6 +54,7 @@ import ChangePasswordModal from "./ChangePasswordModal/ChangePasswordModal";
 
 const UsersManagement = () => {
   const { axiosInstance } = useAxiosPublic();
+  const { user: currentUser } = useAuth();
   const token = localStorage.getItem("auth_token");
 
   // Pagination states
@@ -189,9 +191,38 @@ const UsersManagement = () => {
     showExportOptions(filteredUsers, activeTab, setIsExporting);
   };
 
+  // RBAC: determine if current user can manage a target role
+  const canManageRole = (targetRole) => {
+    if (currentUser?.role === "super_admin") {
+      // Super admin can manage all except super admin accounts
+      return targetRole !== "super_admin";
+    }
+
+    if (currentUser?.role === "admin") {
+      // Admin cannot manage admin or super admin accounts
+      return targetRole !== "admin" && targetRole !== "super_admin";
+    }
+
+    return false;
+  };
+
   // Delete user handler with SweetAlert2
-  const handleDeleteUser = async (userId, userName) => {
+  const handleDeleteUser = async (userId, userName, userRole) => {
     try {
+      if (!canManageRole(userRole)) {
+        await Swal.fire({
+          title: "Protected User",
+          text: "You do not have permission to modify this user.",
+          icon: "warning",
+          timer: 2000,
+          showConfirmButton: false,
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          },
+        });
+        return;
+      }
+
       const result = await Swal.fire({
         title: "Are you sure?",
         html: `
@@ -627,6 +658,7 @@ const UsersManagement = () => {
               paginatedUsers.map((user, index) => {
                 const RoleIcon = roleConfig[user.role]?.icon || FiUserCheck;
                 const userName = user.profile?.fullName || user.email || "Unknown User";
+                const canManageThisUser = canManageRole(user.role);
 
                 return (
                   <motion.tr
@@ -736,57 +768,63 @@ const UsersManagement = () => {
 
                     {/* Actions: view, edit, delete buttons */}
                     <td>
-                      <div className="flex justify-center gap-1">
-                        {/* View button - opens detail modal */}
-                        <button
-                          onClick={() => {
-                            setSelectedUserId(user?._id);
-                            document.getElementById('view_user_modal')?.showModal();
-                          }}
-                          className="btn btn-ghost btn-sm btn-square tooltip"
-                          data-tip="View"
-                          disabled={isDeleting || isExporting}
-                        >
-                          <FiEye size={16} />
-                        </button>
+                      {canManageThisUser ? (
+                        <div className="flex justify-center gap-1">
+                          {/* View button - opens detail modal */}
+                          <button
+                            onClick={() => {
+                              setSelectedUserId(user?._id);
+                              document.getElementById('view_user_modal')?.showModal();
+                            }}
+                            className="btn btn-ghost btn-sm btn-square tooltip"
+                            data-tip="View"
+                            disabled={isDeleting || isExporting}
+                          >
+                            <FiEye size={16} />
+                          </button>
 
-                        {/* Edit button - opens edit modal */}
-                        <button
-                          onClick={() => {
-                            setSelectedUserId(user?._id);
-                            document.getElementById('edit_user_modal')?.showModal();
-                          }}
-                          className="btn btn-ghost btn-sm btn-square tooltip"
-                          data-tip="Edit"
-                          disabled={isDeleting || isExporting}
-                        >
-                          <FiEdit2 size={16} />
-                        </button>
+                          {/* Edit button - opens edit modal */}
+                          <button
+                            onClick={() => {
+                              setSelectedUserId(user?._id);
+                              document.getElementById('edit_user_modal')?.showModal();
+                            }}
+                            className="btn btn-ghost btn-sm btn-square tooltip"
+                            data-tip="Edit"
+                            disabled={isDeleting || isExporting}
+                          >
+                            <FiEdit2 size={16} />
+                          </button>
 
-                        {/* Change Password button - opens password update modal */}
-                        <button
-                          onClick={() => {
-                            setSelectedUserId(user?._id);
-                            setSelectedUserName(userName);
-                            document.getElementById('change_password_modal')?.showModal();
-                          }}
-                          className="btn btn-ghost btn-sm btn-square text-warning tooltip"
-                          data-tip="Change Password"
-                          disabled={isDeleting || isExporting}
-                        >
-                          <FiKey size={16} />
-                        </button>
+                          {/* Change Password button - opens password update modal */}
+                          <button
+                            onClick={() => {
+                              setSelectedUserId(user?._id);
+                              setSelectedUserName(userName);
+                              document.getElementById('change_password_modal')?.showModal();
+                            }}
+                            className="btn btn-ghost btn-sm btn-square text-warning tooltip"
+                            data-tip="Change Password"
+                            disabled={isDeleting || isExporting}
+                          >
+                            <FiKey size={16} />
+                          </button>
 
-                        {/* Delete button - triggers delete confirmation */}
-                        <button
-                          onClick={() => handleDeleteUser(user._id, userName)}
-                          className="btn btn-ghost btn-sm btn-square text-error tooltip"
-                          data-tip="Delete"
-                          disabled={isDeleting || isExporting}
-                        >
-                          <FiTrash2 size={16} />
-                        </button>
-                      </div>
+                          {/* Delete button - triggers delete confirmation */}
+                          <button
+                            onClick={() => handleDeleteUser(user._id, userName, user.role)}
+                            className="btn btn-ghost btn-sm btn-square text-error tooltip"
+                            data-tip="Delete"
+                            disabled={isDeleting || isExporting}
+                          >
+                            <FiTrash2 size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex justify-center">
+                          <span className="badge badge-ghost">Protected</span>
+                        </div>
+                      )}
                     </td>
                   </motion.tr>
                 );
