@@ -84,6 +84,16 @@ const navigationConfig = {
     { name: "Blood Banks Management", path: "/admin/blood-banks-management", icon: FiMapPin },
     { name: "Settings", path: "/admin/settings", icon: FiSettings },
   ],
+
+  super_admin: [
+    { name: "Admin Dashboard", path: "/super_admin/dashboard", icon: FiHome },
+    { name: "My Profile", path: "/super_admin/profile", icon: FiUser },
+    { name: "Users Management", path: "/super_admin/users-management", icon: FiUsers },
+    { name: "Audit Logs", path: "/super_admin/audit-logs", icon: FiClipboard },
+    { name: "System Stats", path: "/super_admin/system-stats", icon: FiBarChart2 },
+    { name: "Blood Banks Management", path: "/super_admin/blood-banks-management", icon: FiMapPin },
+    { name: "Settings", path: "/super_admin/settings", icon: FiSettings },
+  ],
 };
 
 const Backend_Layout = ({ userType }) => {
@@ -99,8 +109,24 @@ const Backend_Layout = ({ userType }) => {
 
   // Format user type for display (capitalize and handle special cases)
   const formatUserType = (type) => {
-    if (type === "blood_bank") return "Blood Bank";
-    return type.charAt(0).toUpperCase() + type.slice(1);
+    if (!type) return "User";
+
+    switch (type) {
+      case "blood_bank":
+        return "Blood Bank";
+      case "super_admin":
+        return "Super Admin";
+      case "admin":
+        return "Admin";
+      case "donor":
+        return "Donor";
+      case "hospital":
+        return "Hospital";
+      case "requester":
+        return "Requester";
+      default:
+        return type.charAt(0).toUpperCase() + type.slice(1);
+    }
   };
 
   // Toggle fullscreen
@@ -111,6 +137,7 @@ const Backend_Layout = ({ userType }) => {
       document.exitFullscreen();
     }
   };
+
 
   // Detect fullscreen changes
   useEffect(() => {
@@ -249,8 +276,9 @@ const Backend_Layout = ({ userType }) => {
           {/* Desktop Greeting */}
           <div className="flex-1 pl-3 hidden lg:block">
             <h2 className="text-lg font-semibold tracking-wide">
-              Welcome back, <span className="text-error ml-2">
-                {formatUserType(userType)} : {user?.profile?.fullName || "User"}
+              Welcome back,{' '}
+              <span className="text-error">
+                {formatUserType(userType)}: {user?.profile?.fullName || "User"}
               </span>
             </h2>
           </div>

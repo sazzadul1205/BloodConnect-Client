@@ -197,6 +197,7 @@ const AdminDashboard = () => {
     ? Math.round((fulfilledRequests / totalRequests) * 100)
     : 0;
 
+  // Handle Refresh
   const handleRefresh = () => {
     refetchUsers()
     refetchBanks()

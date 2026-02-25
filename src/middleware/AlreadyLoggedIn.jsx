@@ -7,6 +7,7 @@ const roleRoutes = {
   requester: "/requester/dashboard",
   blood_bank: "/blood_bank/dashboard",
   admin: "/admin/dashboard",
+  super_admin: "/super_admin/dashboard",
 };
 
 const AlreadyLoggedIn = () => {

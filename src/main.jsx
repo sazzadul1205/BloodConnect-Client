@@ -105,6 +105,20 @@ createRoot(document.getElementById('root')).render(
                 <Route path="/admin/settings" element={<AdminSettings />} />
               </Route>
             </Route>
+
+            {/* Admin Pages */}
+            <Route element={<RequireRole allowedRoles={["admin", "super_admin"]} />} >
+              <Route element={<Backend_Layout userType="super_admin" />}>
+
+                <Route path="/super_admin/dashboard" element={<AdminDashboard />} />
+                <Route path="/super_admin/audit-logs" element={<AuditLogs />} />
+                <Route path="/super_admin/users-management" element={<UsersManagement />} />
+                <Route path="/super_admin/blood-banks-management" element={<BloodBanksManagement />} />
+                <Route path="/super_admin/system-stats" element={<SystemStatistics />} />
+                <Route path="/super_admin/profile" element={<AdminProfile />} />
+                <Route path="/super_admin/settings" element={<AdminSettings />} />
+              </Route>
+            </Route>
           </Route>
 
         </Routes>

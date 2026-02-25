@@ -50,6 +50,7 @@ const Login = () => {
     requester: "/requester/dashboard",
     blood_bank: "/blood_bank/dashboard",
     admin: "/admin/dashboard",
+    super_admin: "/super_admin/dashboard",
   };
 
   // Submit handler
@@ -64,7 +65,6 @@ const Login = () => {
 
       const user = await login(loginData);
 
-      console.log(user?.role);
       navigate(roleRoutes[user.role] || "/");
 
     } catch (err) {

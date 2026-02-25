@@ -29,7 +29,6 @@ import {
   FiUserPlus,
   FiCheckCircle,
   FiXCircle,
-  FiKey,
 } from "react-icons/fi";
 import { FaHeartbeat, FaUserCircle } from "react-icons/fa";
 
@@ -50,7 +49,6 @@ import { showExportOptions } from "./userExport";
 import AddUserModal from "./AddUserModal/AddUserModal";
 import EditUserModal from "./EditUserModal/EditUserModal";
 import ViewUserModal from "./ViewUserModal/ViewUserModal";
-import ChangePasswordModal from "./ChangePasswordModal/ChangePasswordModal";
 
 const UsersManagement = () => {
   const { axiosInstance } = useAxiosPublic();
@@ -66,7 +64,6 @@ const UsersManagement = () => {
   const [selectedRole, setSelectedRole] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const [selectedUserName, setSelectedUserName] = useState("");
   const [selectedVerification, setSelectedVerification] = useState("");
 
   // Role colors and styles
@@ -340,11 +337,9 @@ const UsersManagement = () => {
 
   const CloseModal = () => {
     setSelectedUserId(null);
-    setSelectedUserName("");
     document.getElementById('add_user_modal')?.close();
     document.getElementById('view_user_modal')?.close();
     document.getElementById('edit_user_modal')?.close();
-    document.getElementById('change_password_modal')?.close();
   };
 
   return (
@@ -796,19 +791,7 @@ const UsersManagement = () => {
                             <FiEdit2 size={16} />
                           </button>
 
-                          {/* Change Password button - opens password update modal */}
-                          <button
-                            onClick={() => {
-                              setSelectedUserId(user?._id);
-                              setSelectedUserName(userName);
-                              document.getElementById('change_password_modal')?.showModal();
-                            }}
-                            className="btn btn-ghost btn-sm btn-square text-warning tooltip"
-                            data-tip="Change Password"
-                            disabled={isDeleting || isExporting}
-                          >
-                            <FiKey size={16} />
-                          </button>
+
 
                           {/* Delete button - triggers delete confirmation */}
                           <button
@@ -899,21 +882,10 @@ const UsersManagement = () => {
           <button>close</button>
         </form>
       </dialog>
-
-      {/* Change Password Modal - dialog with backdrop click close */}
-      <dialog id="change_password_modal" className="modal">
-        <ChangePasswordModal
-          userId={selectedUserId}
-          userName={selectedUserName}
-          onClose={() => CloseModal()}
-          refreshUsers={() => usersRefetch()}
-        />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
     </div>
   );
 };
 
 export default UsersManagement;
+
+
