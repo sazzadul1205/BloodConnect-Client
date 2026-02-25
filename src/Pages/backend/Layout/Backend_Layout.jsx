@@ -40,11 +40,12 @@ import MessagesDropdown from "./components/MessagesDropdown";
 const navigationConfig = {
   donor: [
     { name: "Dashboard", path: "/donor/dashboard", icon: FiHome },
-    { name: "Profile", path: "/donor/profile", icon: FiUser },
-    { name: "Medical Info", path: "/donor/medical-info", icon: FiActivity },
+    { name: "Donor Profile", path: "/donor/profile", icon: FiUser },
+    { name: "My Profile", path: "/donor/my-profile", icon: FiUser },
+    { name: "Medical Info", path: "/donor/:donorId/medical", icon: FiActivity },
     { name: "Preferences", path: "/donor/preferences", icon: FiSliders },
-    { name: "Donation History", path: "/donor/donation-history", icon: FiClock },
-    { name: "Blood Requests", path: "/donor/blood-requests", icon: FiDroplet },
+    { name: "Donation History", path: "/donor/history", icon: FiClock },
+    { name: "Blood Requests", path: "/blood-requests", icon: FiDroplet },
     { name: "Events", path: "/donor/events", icon: FiCalendar },
     { name: "Settings", path: "/donor/settings", icon: FiSettings },
   ],
@@ -106,6 +107,14 @@ const Backend_Layout = ({ userType }) => {
 
   // Get navigation items based on user type
   const navigation = navigationConfig[userType] || navigationConfig.donor;
+  const currentUserId = user?._id || user?.userId || user?.id || user?.uid;
+  const resolvedNavigation = navigation.map((item) => ({
+    ...item,
+    path:
+      item.path?.includes(":donorId") && currentUserId
+        ? item.path.replace(":donorId", currentUserId)
+        : item.path,
+  }));
 
   // Format user type for display (capitalize and handle special cases)
   const formatUserType = (type) => {
@@ -170,7 +179,7 @@ const Backend_Layout = ({ userType }) => {
         {/* Sidebar Links - Scrollable */}
         <div className={`flex-1 ${isCollapsed ? "overflow-visible" : "overflow-y-auto"}`}>
           <ul className="p-3 space-y-1">
-            {navigation.map((item) => (
+            {resolvedNavigation.map((item) => (
               <li key={item.name} className={isCollapsed ? "overflow-visible" : ""}>
                 <NavLink
                   to={item.path}
@@ -222,7 +231,7 @@ const Backend_Layout = ({ userType }) => {
 
             <div className="flex-1 overflow-y-auto">
               <ul className="space-y-1">
-                {navigation.map((item) => (
+                {resolvedNavigation.map((item) => (
                   <li key={item.name}>
                     <NavLink
                       to={item.path}
@@ -312,7 +321,7 @@ const Backend_Layout = ({ userType }) => {
       {/* ================= Mobile Bottom Dock ================= */}
       <div className="lg:hidden fixed bottom-0 w-full bg-base-100 border-t border-base-300 flex justify-around py-2 shadow-lg z-40">
         {/* Show first 5 navigation items in dock */}
-        {navigation.slice(0, 5).map((item, idx) => (
+        {resolvedNavigation.slice(0, 5).map((item, idx) => (
           <NavLink
             key={idx}
             to={item.path}
