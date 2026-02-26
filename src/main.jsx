@@ -35,7 +35,9 @@ import AdminDashboard from './Pages/backend/Admin/AdminDashboard/AdminDashboard.
 import AdminSettings from './Pages/backend/Admin/AdminSettings/AdminSettings.jsx';
 import AdminProfile from './Pages/backend/Admin/AdminProfile/AdminProfile.jsx';
 import DonorProfile from './Pages/backend/Donor/DonorProfile/DonorProfile.jsx';
+import DonorDashboard from './Pages/backend/Donor/DonorDashboard/DonorDashboard.jsx';
 import MyProfile from './Pages/backend/Donor/MyProfile/MyProfile.jsx';
+import UserSettings from './Pages/backend/Donor/UserSettings/UserSettings.jsx';
 import MedicalInformation from './Pages/backend/Donor/MedicalInformation/MedicalInformation.jsx';
 import DonationHistory from './Pages/backend/Donor/DonationHistory/DonationHistory.jsx';
 import BloodRequests from './Pages/backend/Donor/BloodRequests/BloodRequests.jsx';
@@ -70,9 +72,10 @@ createRoot(document.getElementById('root')).render(
             <Route element={<RequireRole allowedRoles={["donor", "admin", "super_admin"]} />} >
               <Route element={<Backend_Layout userType="donor" />}>
 
-                <Route path="/donor/dashboard" element={<h1 className='text-black'>Donor Dashboard</h1>} />
+                <Route path="/donor/dashboard" element={<DonorDashboard />} />
                 <Route path="/donor/profile" element={<DonorProfile />} />
                 <Route path="/donor/my-profile" element={<MyProfile />} />
+                <Route path="/donor/settings" element={<UserSettings />} />
                 <Route path="/donor/:donorId/medical" element={<MedicalInformation />} />
                 <Route path="/donor/history" element={<DonationHistory />} />
                 <Route path="/blood-requests" element={<BloodRequests />} />
