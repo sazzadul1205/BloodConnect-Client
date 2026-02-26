@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -12,6 +13,7 @@ import {
   FiCalendar,
   FiDroplet,
   FiKey,
+  FiSettings,
 } from "react-icons/fi";
 
 import useAuth from "../../../../hooks/useAuth";
@@ -182,6 +184,10 @@ const MyProfile = () => {
         </div>
 
         <div className="flex gap-2">
+          <Link to="/donor/settings" className="btn btn-outline btn-sm gap-2">
+            <FiSettings size={16} />
+            Settings
+          </Link>
           <button
             type="button"
             onClick={() =>
@@ -448,4 +454,3 @@ const MyProfile = () => {
 };
 
 export default MyProfile;
-
