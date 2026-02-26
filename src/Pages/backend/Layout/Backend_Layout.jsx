@@ -62,7 +62,6 @@ const navigationConfig = {
     { name: "Dashboard", path: "/requester/dashboard", icon: FiHome },
     { name: "Create Request", path: "/requester/create-request", icon: FiPlusCircle },
     { name: "My Requests", path: "/requester/my-requests", icon: FiList },
-    { name: "Request Details", path: "/requester/request-details", icon: FiClipboard },
     { name: "Blood Banks", path: "/requester/blood-banks", icon: FiMapPin },
     { name: "Settings", path: "/requester/settings", icon: FiSettings },
   ],
