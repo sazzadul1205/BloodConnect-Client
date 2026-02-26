@@ -2,6 +2,7 @@
 
 // React
 import React, { useState } from "react";
+import { useNavigate } from "react-router";
 
 // Sweet Alert
 import Swal from "sweetalert2";
@@ -63,6 +64,7 @@ const initialForm = {
 const CreateRequest = () => {
   const { axiosInstance } = useAxiosPublic();
   const token = localStorage.getItem("auth_token");
+  const navigate = useNavigate();
 
   // States
   const [submitting, setSubmitting] = useState(false);
@@ -163,6 +165,7 @@ const CreateRequest = () => {
       });
 
       setForm(initialForm);
+      navigate("/requester/my-requests");
     } catch (err) {
       await Swal.fire({
         title: "Request Failed",
