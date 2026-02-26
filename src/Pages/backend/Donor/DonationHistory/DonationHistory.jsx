@@ -1,4 +1,4 @@
-// Pages/backend/Donor/DonationHistory/DonationHistory.jsx
+﻿// Pages/backend/Donor/DonationHistory/DonationHistory.jsx
 
 // React
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -171,7 +171,7 @@ const DonationHistory = () => {
       });
 
       await Swal.fire({
-        title: "Donation Added! 🎉",
+        title: "Donation Added",
         html: `
           <div class="text-center">
             <p class="mb-2">Donation record was added successfully.</p>
@@ -366,7 +366,7 @@ const DonationHistory = () => {
               Add New Donation Record
             </h3>
             <span className={`transform transition-transform ${showAddForm ? 'rotate-180' : ''}`}>
-              ▼
+              v
             </span>
           </div>
 
@@ -664,7 +664,7 @@ const DonationHistory = () => {
                   onClick={closeDetailsModal}
                   className="btn btn-ghost btn-sm btn-circle text-white hover:bg-white/20"
                 >
-                  ✕
+                  X
                 </button>
               </div>
             </div>
@@ -775,3 +775,4 @@ const DonationHistory = () => {
 };
 
 export default DonationHistory;
+

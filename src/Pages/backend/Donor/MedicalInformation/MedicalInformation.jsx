@@ -1,4 +1,4 @@
-// Pages/backend/Donor/MedicalInformation/MedicalInformation.jsx
+﻿// Pages/backend/Donor/MedicalInformation/MedicalInformation.jsx
 
 // React
 import React, { useEffect, useMemo, useState } from "react";
@@ -253,7 +253,7 @@ const MedicalInformation = () => {
       closeModal();
 
       await Swal.fire({
-        title: "Medical Information Updated! 🎉",
+        title: "Medical Information Updated",
         html: `
           <div class="text-center">
             <p class="mb-2">Your medical information has been saved successfully.</p>
@@ -741,7 +741,7 @@ const MedicalInformation = () => {
                   onClick={prevStep}
                   className="btn btn-outline btn-warning"
                 >
-                  ← Previous
+                  Previous
                 </button>
               )}
               {step < 4 ? (
@@ -750,7 +750,7 @@ const MedicalInformation = () => {
                   onClick={nextStep}
                   className="btn btn-warning text-white ml-auto"
                 >
-                  Next →
+                  Next
                 </button>
               ) : (
                 <div className="flex gap-2 ml-auto">

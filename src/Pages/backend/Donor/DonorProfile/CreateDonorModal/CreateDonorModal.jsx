@@ -1,4 +1,4 @@
-// Pages/backend/Donor/DonorProfile/CreateDonorModal/CreateDonorModal.jsx
+﻿// Pages/backend/Donor/DonorProfile/CreateDonorModal/CreateDonorModal.jsx
 
 // React
 import React, { useState } from "react";
@@ -207,7 +207,7 @@ const CreateDonorModal = ({ refreshDonors, onSuccess }) => {
 
         // SweetAlert2 success with DaisyUI styling
         await Swal.fire({
-          title: "Donor Profile Created! 🎉",
+          title: "Donor Profile Created",
           html: `
             <div class="text-center">
               <p class="mb-2">Your donor profile has been created successfully.</p>
@@ -877,7 +877,7 @@ const CreateDonorModal = ({ refreshDonors, onSuccess }) => {
                 onClick={prevStep}
                 className="btn btn-outline btn-error"
               >
-                ← Previous
+                Previous
               </button>
             )}
             {step < 4 ? (
@@ -886,7 +886,7 @@ const CreateDonorModal = ({ refreshDonors, onSuccess }) => {
                 onClick={nextStep}
                 className="btn btn-error text-white ml-auto"
               >
-                Next →
+                Next
               </button>
             ) : (
               <div className="flex gap-2 ml-auto">

@@ -1,4 +1,4 @@
-// Pages/backend/Donor/DonorProfile/EditDonorModal/EditDonorModal.jsx
+﻿// Pages/backend/Donor/DonorProfile/EditDonorModal/EditDonorModal.jsx
 
 // React
 import React, { useState, useEffect, useCallback } from "react";
@@ -267,7 +267,7 @@ const EditDonorModal = ({ donorId, donorData, refreshDonors, onSuccess }) => {
 
         // SweetAlert2 success with DaisyUI styling
         await Swal.fire({
-          title: "Donor Profile Updated! 🎉",
+          title: "Donor Profile Updated",
           html: `
             <div class="text-center">
               <p class="mb-2">Your donor profile has been updated successfully.</p>
@@ -944,7 +944,7 @@ const EditDonorModal = ({ donorId, donorData, refreshDonors, onSuccess }) => {
                 onClick={prevStep}
                 className="btn btn-outline btn-warning"
               >
-                ← Previous
+                Previous
               </button>
             )}
             {step < 4 ? (
@@ -953,7 +953,7 @@ const EditDonorModal = ({ donorId, donorData, refreshDonors, onSuccess }) => {
                 onClick={nextStep}
                 className="btn btn-warning text-white ml-auto"
               >
-                Next →
+                Next
               </button>
             ) : (
               <div className="flex gap-2 ml-auto">
@@ -991,3 +991,4 @@ const EditDonorModal = ({ donorId, donorData, refreshDonors, onSuccess }) => {
 };
 
 export default EditDonorModal;
+

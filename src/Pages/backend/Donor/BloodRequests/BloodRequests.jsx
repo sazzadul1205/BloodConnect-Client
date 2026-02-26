@@ -1,4 +1,4 @@
-// Pages/backend/Donor/BloodRequests/BloodRequests.jsx
+﻿// Pages/backend/Donor/BloodRequests/BloodRequests.jsx
 
 // React
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -206,7 +206,7 @@ const BloodRequests = () => {
       );
 
       await Swal.fire({
-        title: "Response Sent! 🎉",
+        title: "Response Sent",
         html: `
           <div class="text-center">
             <p class="mb-2">You marked this request as ${respondForm.response}.</p>

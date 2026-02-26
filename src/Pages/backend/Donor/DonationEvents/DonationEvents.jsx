@@ -1,4 +1,4 @@
-// Pages/backend/Donor/DonationEvents/DonationEvents.jsx
+﻿// Pages/backend/Donor/DonationEvents/DonationEvents.jsx
 
 // React
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -239,7 +239,7 @@ const DonationEvents = () => {
         );
 
         await Swal.fire({
-          title: "Successfully Registered! 🎉",
+          title: "Successfully Registered",
           html: `
             <div class="text-center">
               <p class="mb-2">You have been registered for this event.</p>
@@ -592,7 +592,7 @@ const DonationEvents = () => {
                     {/* Event Details */}
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold text-lg">{event?.title || "Untitled Event"}</p>
+                        <p className="font-semibold text-lg">{event?.title || "Event"}</p>
                         <span className={`badge badge-${typeColor} badge-sm capitalize`}>
                           {eventTypeConfig[eventType]?.label || eventType}
                         </span>
@@ -720,7 +720,7 @@ const DonationEvents = () => {
                     onClick={() => setSelectedEvent(null)}
                     className="btn btn-ghost btn-sm btn-circle text-white hover:bg-white/20"
                   >
-                    ✕
+                    X
                   </button>
                 </div>
               </div>
@@ -855,7 +855,7 @@ const DonationEvents = () => {
                         {selectedEvent.registeredDonors.slice(0, 5).map((reg, idx) => (
                           <div key={idx} className="badge badge-outline gap-1 p-3">
                             <FiUser className="text-xs" />
-                            {reg.donorName || `Donor ${idx + 1}`}
+                            {reg.donorName || "Registered Donor"}
                           </div>
                         ))}
                         {selectedEvent.registeredDonors.length > 5 && (
@@ -945,3 +945,4 @@ const DonationEvents = () => {
 };
 
 export default DonationEvents;
+
