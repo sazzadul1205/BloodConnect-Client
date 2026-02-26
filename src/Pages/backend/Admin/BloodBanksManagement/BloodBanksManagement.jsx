@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 // Sweet Alert
 import Swal from "sweetalert2";
@@ -42,11 +42,13 @@ import BloodLoader from "../../../../shared/BloodLoader";
 import ResultsCount from "../../../../shared/ResultsCount";
 
 // Modals
-import EditBloodBankModal from "./EditBloodBankModal/EditBloodBankModal";
-import ViewBloodBankModal from "./ViewBloodBankModal/ViewBloodBankModal";
-import InventoryModal from "./InventoryModal/InventoryModal";
 import StaffModal from "./StaffModal/StaffModal";
+import InventoryModal from "./InventoryModal/InventoryModal";
 import AddBloodBankModal from "./AddBloodBankModal/AddBloodBankModal";
+import ViewBloodBankModal from "./ViewBloodBankModal/ViewBloodBankModal";
+import EditBloodBankModal from "./EditBloodBankModal/EditBloodBankModal";
+
+// Utils
 import { showExportOptions } from "./BloodBanksExport";
 
 const BloodBanksManagement = () => {

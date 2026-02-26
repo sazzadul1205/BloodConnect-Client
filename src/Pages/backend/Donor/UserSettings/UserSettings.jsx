@@ -1,5 +1,6 @@
 // Pages/frontend/User/UserSettings/UserSettings.jsx
 
+// React
 import React, { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
@@ -14,7 +15,6 @@ import {
   FiSettings,
   FiBell,
   FiShield,
-  FiSliders,
   FiSave,
   FiTrash2,
   FiMail,
@@ -219,7 +219,6 @@ const UserSettings = () => {
     });
   };
 
-
   // Handle delete account with confirmation
   const handleDeleteAccount = async () => {
     const result = await Swal.fire({
@@ -253,7 +252,10 @@ const UserSettings = () => {
     );
   }
 
+  // Loading state
   if (isLoading) return <BloodLoader />;
+
+  // Error state
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   return (

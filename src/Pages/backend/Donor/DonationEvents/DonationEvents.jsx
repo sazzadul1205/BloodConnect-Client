@@ -20,19 +20,15 @@ import {
   FiEye,
   FiCheckCircle,
   FiXCircle,
-  FiAlertCircle,
   FiFilter,
-  FiUser,
 } from "react-icons/fi";
 
 // Icons - Fa (Font Awesome)
 import {
   FaHospital,
   FaUsers,
-  FaTint,
   FaHeartbeat,
   FaCalendarAlt,
-  FaCheckCircle as FaCheckCircleSolid,
   FaTimesCircle,
 } from "react-icons/fa";
 
@@ -41,8 +37,11 @@ import useAuth from "../../../../hooks/useAuth";
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 
 // Shared
-import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import BloodLoader from "../../../../shared/BloodLoader";
+
+// Modals
+import EventDetailsModal from "./EventDetailsModal/EventDetailsModal";
 
 // Helper function to extract ID from MongoDB ObjectId
 const getId = (value) =>
@@ -61,7 +60,6 @@ const formatDateTime = (value) => {
   });
 };
 
-
 // Event type colors and icons
 const eventTypeConfig = {
   drive: { icon: FaHeartbeat, color: "success", label: "Blood Drive" },
@@ -79,8 +77,8 @@ const statusColors = {
 };
 
 const DonationEvents = () => {
-  const { user, loading: authLoading } = useAuth();
   const { axiosInstance } = useAxiosPublic();
+  const { user, loading: authLoading } = useAuth();
   const token = localStorage.getItem("auth_token");
 
   // Get donor ID from user object
@@ -90,19 +88,22 @@ const DonationEvents = () => {
   );
 
   // States
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("all");
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [actionLoadingId, setActionLoadingId] = useState("");
+
+  // Map state
   const [coords, setCoords] = useState({
     latitude: "",
     longitude: "",
-    radius: 50000, // Default 50km radius
+    radius: 50000,
   });
-  const [detailsLoading, setDetailsLoading] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [actionLoadingId, setActionLoadingId] = useState("");
-  const [filterOpen, setFilterOpen] = useState(false);
+
+  // Filters state
   const [filters, setFilters] = useState({
     bloodType: "",
     eventType: "",
@@ -154,6 +155,11 @@ const DonationEvents = () => {
         confirmButtonColor: "#ef4444",
         background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
         color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
       });
       return;
     }
@@ -179,12 +185,12 @@ const DonationEvents = () => {
   // Fetch event details by ID
   const fetchEventDetails = useCallback(
     async (eventId) => {
-      setDetailsLoading(true);
       try {
         const res = await axiosInstance.get(`/donation-events/${eventId}`, {
           headers: authHeaders,
         });
         setSelectedEvent(res.data?.data || null);
+        document.getElementById("event_details_modal")?.showModal();
       } catch (err) {
         await Swal.fire({
           title: "Failed To Load Event",
@@ -193,13 +199,21 @@ const DonationEvents = () => {
           confirmButtonColor: "#ef4444",
           background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
           color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            confirmButton: "btn btn-sm btn-error text-white",
+          },
+          buttonsStyling: false,
         });
-      } finally {
-        setDetailsLoading(false);
       }
     },
     [authHeaders, axiosInstance],
   );
+
+  const CloseModal = useCallback(() => {
+    setSelectedEvent(null);
+    document.getElementById("event_details_modal")?.close();
+  }, []);
 
   // Refresh current tab
   const refreshCurrentTab = useCallback(async () => {
@@ -251,10 +265,14 @@ const DonationEvents = () => {
           confirmButtonText: "Great!",
           background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
           color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            confirmButton: "btn btn-sm btn-error text-white",
+          },
+          buttonsStyling: false,
         });
 
         await refreshCurrentTab();
-        await fetchEventDetails(eventId);
       } catch (err) {
         await Swal.fire({
           title: "Registration Failed",
@@ -263,12 +281,17 @@ const DonationEvents = () => {
           confirmButtonColor: "#ef4444",
           background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
           color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            confirmButton: "btn btn-sm btn-error text-white",
+          },
+          buttonsStyling: false,
         });
       } finally {
         setActionLoadingId("");
       }
     },
-    [authHeaders, axiosInstance, fetchEventDetails, refreshCurrentTab],
+    [authHeaders, axiosInstance, refreshCurrentTab],
   );
 
   // Handle registration cancellation
@@ -286,6 +309,12 @@ const DonationEvents = () => {
         cancelButtonText: "No, keep",
         background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
         color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+          cancelButton: "btn btn-sm",
+        },
+        buttonsStyling: false,
       });
 
       if (!result.isConfirmed) return;
@@ -309,10 +338,14 @@ const DonationEvents = () => {
           confirmButtonText: "OK",
           background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
           color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            confirmButton: "btn btn-sm btn-error text-white",
+          },
+          buttonsStyling: false,
         });
 
         await refreshCurrentTab();
-        await fetchEventDetails(eventId);
       } catch (err) {
         await Swal.fire({
           title: "Cancel Failed",
@@ -321,16 +354,22 @@ const DonationEvents = () => {
           confirmButtonColor: "#ef4444",
           background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
           color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            confirmButton: "btn btn-sm btn-error text-white",
+          },
+          buttonsStyling: false,
         });
       } finally {
         setActionLoadingId("");
       }
     },
-    [authHeaders, axiosInstance, fetchEventDetails, refreshCurrentTab],
+    [authHeaders, axiosInstance, refreshCurrentTab],
   );
 
   // Get user's current location
   const useMyLocation = () => {
+    // Check if geolocation is supported
     if (!navigator.geolocation) {
       Swal.fire({
         title: "Not Supported",
@@ -339,10 +378,16 @@ const DonationEvents = () => {
         confirmButtonColor: "#ef4444",
         background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
         color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
       });
       return;
     }
 
+    // Get user's current location
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setCoords((prev) => ({
@@ -360,6 +405,10 @@ const DonationEvents = () => {
           showConfirmButton: false,
           background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
           color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          },
+          buttonsStyling: false,
         });
       },
       async () => {
@@ -370,6 +419,11 @@ const DonationEvents = () => {
           confirmButtonColor: "#ef4444",
           background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
           color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+          customClass: {
+            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            confirmButton: "btn btn-sm btn-error text-white",
+          },
+          buttonsStyling: false,
         });
       },
     );
@@ -377,8 +431,10 @@ const DonationEvents = () => {
 
   // Filter events based on filters
   const filteredEvents = useMemo(() => {
+    // Copy events
     let filtered = [...events];
 
+    // Filter by blood type
     if (filters.bloodType) {
       filtered = filtered.filter(event =>
         event?.requirements?.bloodTypes?.includes(filters.bloodType) ||
@@ -386,6 +442,7 @@ const DonationEvents = () => {
       );
     }
 
+    // Filter by event type
     if (filters.eventType) {
       filtered = filtered.filter(event => event?.type === filters.eventType);
     }
@@ -400,6 +457,11 @@ const DonationEvents = () => {
     }
   }, [authLoading, fetchAllEvents]);
 
+  // Reset filters when tab changes
+  useEffect(() => {
+    setFilters({ bloodType: "", eventType: "" });
+  }, [activeTab]);
+
   // Loading state
   if (loading || authLoading) return <BloodLoader />;
 
@@ -408,10 +470,17 @@ const DonationEvents = () => {
 
   return (
     <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* Header Section with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
+      >
+        {/* Header copy: communicates context and purpose of donation events dashboard. */}
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
+            {/* Visual identity icon for donation events system. */}
             <FiCalendar className="text-error" />
             Donation Events
           </h2>
@@ -420,42 +489,55 @@ const DonationEvents = () => {
           </p>
         </div>
 
-        {/* Tab Buttons */}
+        {/* Tab Buttons with staggered animations */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             type="button"
             className={`btn btn-sm ${activeTab === 'all' ? 'btn-error' : 'btn-outline'}`}
             onClick={fetchAllEvents}
           >
             All Events
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             type="button"
             className={`btn btn-sm ${activeTab === 'upcoming' ? 'btn-error' : 'btn-outline'}`}
             onClick={fetchUpcomingEvents}
           >
             Upcoming
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             type="button"
             className={`btn btn-sm ${activeTab === 'nearby' ? 'btn-error' : 'btn-outline'}`}
             onClick={fetchNearbyEvents}
           >
             Nearby
-          </button>
-          <button
+          </motion.button>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
             type="button"
             className="btn btn-sm btn-error gap-2"
             onClick={refreshCurrentTab}
           >
-            <FiRefreshCw />
+            <FiRefreshCw size={14} />
             Refresh
-          </button>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Nearby Search Panel */}
-      <div className="bg-base-100 border border-base-300 rounded-lg p-4 space-y-3">
+      {/* Nearby Search Panel with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="bg-base-100 border border-base-300 rounded-lg p-4 space-y-3"
+      >
         <div className="flex items-center justify-between">
           <h3 className="font-semibold flex items-center gap-2">
             <FiNavigation className="text-error" />
@@ -463,10 +545,10 @@ const DonationEvents = () => {
           </h3>
           <button
             type="button"
-            className="btn btn-xs btn-ghost"
+            className="btn btn-xs btn-ghost gap-1"
             onClick={() => setFilterOpen(!filterOpen)}
           >
-            <FiFilter />
+            <FiFilter size={14} />
             {filterOpen ? 'Hide Filters' : 'Show Filters'}
           </button>
         </div>
@@ -503,7 +585,7 @@ const DonationEvents = () => {
             className="btn btn-sm btn-outline gap-2"
             onClick={useMyLocation}
           >
-            <FiNavigation />
+            <FiNavigation size={14} />
             Use My Location
           </button>
         </div>
@@ -515,11 +597,12 @@ const DonationEvents = () => {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
               className="pt-3 border-t border-base-300"
             >
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <select
-                  className="select select-bordered select-sm"
+                  className="select select-bordered select-sm w-full"
                   value={filters.eventType}
                   onChange={(e) => setFilters(prev => ({ ...prev, eventType: e.target.value }))}
                 >
@@ -529,7 +612,7 @@ const DonationEvents = () => {
                   ))}
                 </select>
                 <select
-                  className="select select-bordered select-sm"
+                  className="select select-bordered select-sm w-full"
                   value={filters.bloodType}
                   onChange={(e) => setFilters(prev => ({ ...prev, bloodType: e.target.value }))}
                 >
@@ -547,10 +630,15 @@ const DonationEvents = () => {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </motion.div>
 
-      {/* Events List */}
-      <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
+      {/* Events List with Fade In */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.15 }}
+        className="bg-base-100 border border-base-300 rounded-lg overflow-hidden"
+      >
         <div className="p-4 border-b border-base-300 flex items-center justify-between">
           <span className="font-semibold capitalize flex items-center gap-2">
             {activeTab === 'all' ? 'All' : activeTab === 'upcoming' ? 'Upcoming' : 'Nearby'} Events
@@ -565,7 +653,7 @@ const DonationEvents = () => {
 
         {filteredEvents.length > 0 ? (
           <div className="divide-y divide-base-300">
-            {filteredEvents.map((event) => {
+            {filteredEvents.map((event, index) => {
               const eventId = String(getId(event?._id) || "");
               const registered = isRegistered(event);
               const busy = actionLoadingId === eventId;
@@ -579,8 +667,9 @@ const DonationEvents = () => {
               return (
                 <motion.div
                   key={eventId}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.2 + index * 0.02 }}
                   className="p-4 hover:bg-base-200 transition-colors"
                 >
                   <div className="flex flex-col xl:flex-row xl:items-center gap-4">
@@ -610,19 +699,19 @@ const DonationEvents = () => {
 
                       <div className="flex flex-wrap gap-4 text-sm">
                         <span className="flex items-center gap-1">
-                          <FiClock className="opacity-70" />
+                          <FiClock className="opacity-70" size={14} />
                           {formatDateTime(event?.schedule?.startDate)}
                         </span>
                         <span className="flex items-center gap-1">
-                          <FiMapPin className="opacity-70" />
+                          <FiMapPin className="opacity-70" size={14} />
                           {event?.location?.venue || event?.location?.address || "Location unavailable"}
                         </span>
                         <span className="flex items-center gap-1">
-                          <FaHospital className="opacity-70" />
+                          <FaHospital className="opacity-70" size={14} />
                           {event?.bloodBank?.name || "Blood bank unavailable"}
                         </span>
                         <span className="flex items-center gap-1">
-                          <FaUsers className="opacity-70" />
+                          <FaUsers className="opacity-70" size={14} />
                           <span className={spotsLeft < 10 ? 'text-error font-semibold' : ''}>
                             {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
                           </span>
@@ -636,9 +725,8 @@ const DonationEvents = () => {
                         type="button"
                         className="btn btn-sm btn-ghost"
                         onClick={() => fetchEventDetails(eventId)}
-                        disabled={detailsLoading}
                       >
-                        <FiEye />
+                        <FiEye size={16} />
                         Details
                       </button>
 
@@ -652,7 +740,7 @@ const DonationEvents = () => {
                           {busy ? (
                             <span className="loading loading-spinner loading-xs"></span>
                           ) : (
-                            <FiXCircle />
+                            <FiXCircle size={16} />
                           )}
                           {busy ? "Cancelling..." : "Cancel"}
                         </button>
@@ -666,7 +754,7 @@ const DonationEvents = () => {
                           {busy ? (
                             <span className="loading loading-spinner loading-xs"></span>
                           ) : (
-                            <FiCheckCircle />
+                            <FiCheckCircle size={16} />
                           )}
                           {busy ? "Registering..." : isFull ? "Full" : "Register"}
                         </button>
@@ -678,8 +766,13 @@ const DonationEvents = () => {
             })}
           </div>
         ) : (
-          // Empty State
-          <div className="p-12 text-center text-base-content/70">
+          // Empty State with animation
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.25 }}
+            className="p-12 text-center text-base-content/70"
+          >
             <FiActivity className="mx-auto text-4xl mb-3 opacity-50" />
             <p className="text-lg font-medium mb-1">No Events Found</p>
             <p className="text-sm opacity-70">
@@ -687,262 +780,26 @@ const DonationEvents = () => {
                 ? "No donation events found near your location. Try increasing the radius or check back later."
                 : "No donation events match your current filters. Try adjusting your search criteria."}
             </p>
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
 
       {/* Event Details Modal */}
-      <AnimatePresence>
-        {selectedEvent && (
-          <dialog className="modal modal-open" onClick={() => setSelectedEvent(null)}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="modal-box max-w-3xl p-0 overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="bg-linear-to-r from-error to-error/80 p-6 text-white">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <FiCalendar size={24} />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-2xl">{selectedEvent.title}</h3>
-                      <p className="text-white/80 text-sm">
-                        {eventTypeConfig[selectedEvent?.type]?.label || selectedEvent?.type || "Event"}
-                      </p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setSelectedEvent(null)}
-                    className="btn btn-ghost btn-sm btn-circle text-white hover:bg-white/20"
-                  >
-                    X
-                  </button>
-                </div>
-              </div>
-
-              {/* Modal Content */}
-              <div className="p-6 max-h-[70vh] overflow-y-auto">
-                {/* Description */}
-                <p className="text-base-content/70 mb-4">{selectedEvent.description}</p>
-
-                {/* Event Details Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Date & Time Card */}
-                  <div className="bg-base-200 rounded-lg p-4">
-                    <h4 className="font-semibold flex items-center gap-2 mb-3">
-                      <FiClock className="text-error" />
-                      Date & Time
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <p className="opacity-70">Start</p>
-                        <p className="font-medium">{formatDateTime(selectedEvent?.schedule?.startDate)}</p>
-                      </div>
-                      <div>
-                        <p className="opacity-70">End</p>
-                        <p className="font-medium">{formatDateTime(selectedEvent?.schedule?.endDate)}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Location Card */}
-                  <div className="bg-base-200 rounded-lg p-4">
-                    <h4 className="font-semibold flex items-center gap-2 mb-3">
-                      <FiMapPin className="text-error" />
-                      Location
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <p className="opacity-70">Venue</p>
-                        <p className="font-medium">{selectedEvent?.location?.venue || "N/A"}</p>
-                      </div>
-                      <div>
-                        <p className="opacity-70">Address</p>
-                        <p className="font-medium">{selectedEvent?.location?.address || "N/A"}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Capacity Card */}
-                  <div className="bg-base-200 rounded-lg p-4">
-                    <h4 className="font-semibold flex items-center gap-2 mb-3">
-                      <FaUsers className="text-error" />
-                      Capacity
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <p className="opacity-70">Registered</p>
-                        <p className="font-medium">{selectedEvent?.capacity?.currentRegistrations || 0}</p>
-                      </div>
-                      <div>
-                        <p className="opacity-70">Maximum Donors</p>
-                        <p className="font-medium">{selectedEvent?.capacity?.maxDonors || 0}</p>
-                      </div>
-                      <div>
-                        <p className="opacity-70">Spots Left</p>
-                        <p className={`font-medium ${selectedEvent?.spotsLeft < 10 ? 'text-error' : ''}`}>
-                          {selectedEvent?.spotsLeft || 0}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Requirements Card */}
-                  <div className="bg-base-200 rounded-lg p-4">
-                    <h4 className="font-semibold flex items-center gap-2 mb-3">
-                      <FaTint className="text-error" />
-                      Requirements
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div>
-                        <p className="opacity-70">Accepted Blood Types</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedEvent?.requirements?.bloodTypes?.length > 0 ? (
-                            selectedEvent.requirements.bloodTypes.map((type) => (
-                              <span key={type} className="badge badge-error badge-sm">{type}</span>
-                            ))
-                          ) : (
-                            <span className="text-sm">All types accepted</span>
-                          )}
-                        </div>
-                      </div>
-                      {selectedEvent?.requirements?.ageMin && (
-                        <div>
-                          <p className="opacity-70">Minimum Age</p>
-                          <p className="font-medium">{selectedEvent.requirements.ageMin} years</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Blood Bank Card */}
-                  {selectedEvent?.bloodBank && (
-                    <div className="bg-base-200 rounded-lg p-4 md:col-span-2">
-                      <h4 className="font-semibold flex items-center gap-2 mb-3">
-                        <FaHospital className="text-error" />
-                        Organizing Blood Bank
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="opacity-70">Name</p>
-                          <p className="font-medium">{selectedEvent.bloodBank.name}</p>
-                        </div>
-                        <div>
-                          <p className="opacity-70">Contact</p>
-                          <p className="font-medium">{selectedEvent.bloodBank.phone || "N/A"}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <p className="opacity-70">Address</p>
-                          <p className="font-medium">{selectedEvent.bloodBank.address || "N/A"}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Registered Donors Card (if any) */}
-                  {selectedEvent?.registeredDonors?.length > 0 && (
-                    <div className="bg-base-200 rounded-lg p-4 md:col-span-2">
-                      <h4 className="font-semibold flex items-center gap-2 mb-3">
-                        <FaUsers className="text-error" />
-                        Registered Donors ({selectedEvent.registeredDonors.length})
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {selectedEvent.registeredDonors.slice(0, 5).map((reg, idx) => (
-                          <div key={idx} className="badge badge-outline gap-1 p-3">
-                            <FiUser className="text-xs" />
-                            {reg.donorName || "Registered Donor"}
-                          </div>
-                        ))}
-                        {selectedEvent.registeredDonors.length > 5 && (
-                          <div className="badge badge-outline p-3">
-                            +{selectedEvent.registeredDonors.length - 5} more
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Registration Status Alert */}
-                {isRegistered(selectedEvent) && (
-                  <div className="mt-4 alert alert-success bg-success/10 border-success/20">
-                    <FaCheckCircleSolid className="text-success" />
-                    <span>You are registered for this event.</span>
-                  </div>
-                )}
-
-                {selectedEvent?.spotsLeft === 0 && (
-                  <div className="mt-4 alert alert-error bg-error/10 border-error/20">
-                    <FiAlertCircle className="text-error" />
-                    <span>This event is full. No more registrations accepted.</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Modal Footer */}
-              <div className="modal-action border-t border-base-300 p-4 bg-base-200/50">
-                <div className="flex justify-end gap-2 w-full">
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => setSelectedEvent(null)}
-                  >
-                    Close
-                  </button>
-                  {isRegistered(selectedEvent) ? (
-                    <button
-                      type="button"
-                      className="btn btn-warning gap-2"
-                      onClick={() => {
-                        setSelectedEvent(null);
-                        handleCancelRegistration(getId(selectedEvent._id));
-                      }}
-                      disabled={actionLoadingId === getId(selectedEvent._id)}
-                    >
-                      {actionLoadingId === getId(selectedEvent._id) ? (
-                        <span className="loading loading-spinner loading-sm"></span>
-                      ) : (
-                        <FiXCircle />
-                      )}
-                      Cancel Registration
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`btn gap-2 ${selectedEvent?.spotsLeft === 0 ? 'btn-disabled' : 'btn-error'}`}
-                      onClick={() => {
-                        setSelectedEvent(null);
-                        handleRegister(getId(selectedEvent._id));
-                      }}
-                      disabled={actionLoadingId === getId(selectedEvent._id) || selectedEvent?.spotsLeft === 0}
-                    >
-                      {actionLoadingId === getId(selectedEvent._id) ? (
-                        <span className="loading loading-spinner loading-sm"></span>
-                      ) : (
-                        <FiCheckCircle />
-                      )}
-                      {selectedEvent?.spotsLeft === 0 ? 'Event Full' : 'Register Now'}
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Modal Backdrop */}
-            <form method="dialog" className="modal-backdrop">
-              <button onClick={() => setSelectedEvent(null)}>close</button>
-            </form>
-          </dialog>
-        )}
-      </AnimatePresence>
+      <dialog id="event_details_modal" className="modal">
+        <EventDetailsModal
+          onRegister={handleRegister}
+          isRegistered={isRegistered}
+          selectedEvent={selectedEvent}
+          actionLoadingId={actionLoadingId}
+          onClose={CloseModal}
+          onCancelRegistration={handleCancelRegistration}
+        />
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
     </div>
   );
 };
 
 export default DonationEvents;
-
