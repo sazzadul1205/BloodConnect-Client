@@ -28,6 +28,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import ErrorState from "../../../../shared/ErrorState";
 import BloodLoader from "../../../../shared/BloodLoader";
 import MedicalEditModal from "./MedicalEditModal/MedicalEditModal";
+import DonorProfileRequired from "../../../../shared/DonorProfileRequired";
 
 // Constants
 const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -54,6 +55,7 @@ const MedicalInformation = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [profileMissing, setProfileMissing] = useState(false);
   const [modalKey, setModalKey] = useState(0);
 
   // Medical history arrays for multi-select
@@ -80,6 +82,7 @@ const MedicalInformation = () => {
 
       setLoading(true);
       setError(null);
+      setProfileMissing(false);
       try {
         const token = localStorage.getItem("auth_token");
         const res = await axiosInstance.get(`/donors/${donorId}`, {
@@ -101,7 +104,12 @@ const MedicalInformation = () => {
         setAllergies(Array.isArray(medical.allergies) ? medical.allergies : []);
         setMedications(Array.isArray(medical.medications) ? medical.medications : []);
       } catch (err) {
-        setError(err);
+        if (err?.response?.status === 404) {
+          setProfileMissing(true);
+          setError(null);
+        } else {
+          setError(err);
+        }
       } finally {
         setLoading(false);
       }
@@ -189,6 +197,14 @@ const MedicalInformation = () => {
 
   // Error state
   if (error) return <ErrorState error={error} onRetry={() => window.location.reload()} />;
+  if (profileMissing) {
+    return (
+      <DonorProfileRequired
+        title="Medical Info Needs Donor Profile"
+        description="Create your donor profile to manage medical information and eligibility."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 min-h-screen bg-base-200 p-6">

@@ -41,6 +41,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import DonorProfileRequired from "../../../../shared/DonorProfileRequired";
 
 // Helper function to extract ID from MongoDB ObjectId
 const getId = (value) =>
@@ -92,6 +93,7 @@ const DonorDashboard = () => {
   // States
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [profileMissing, setProfileMissing] = useState(false);
   const [donor, setDonor] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [upcomingEvents, setUpcomingEvents] = useState([]);
@@ -108,19 +110,22 @@ const DonorDashboard = () => {
 
     setRefreshing(true);
     setError(null);
+    setProfileMissing(false);
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Fetch donor profile, pending requests, and upcoming events in parallel
-      const [donorRes, requestsRes, eventsRes] = await Promise.all([
-        axiosInstance.get(`/donors/${donorId}`, { headers }),
+      // Fetch donor profile first because dashboard depends on it
+      const donorRes = await axiosInstance.get(`/donors/${donorId}`, { headers });
+      const donorData = donorRes?.data?.data || null;
+      setDonor(donorData);
+
+      // Fetch pending requests and upcoming events in parallel
+      const [requestsRes, eventsRes] = await Promise.all([
         axiosInstance.get("/blood-requests?status=pending", { headers }),
         axiosInstance.get("/donation-events?upcoming=true"),
       ]);
 
-      const donorData = donorRes?.data?.data || null;
-      setDonor(donorData);
       setPendingRequests(requestsRes?.data?.data || []);
       setUpcomingEvents(eventsRes?.data?.data || []);
 
@@ -133,7 +138,12 @@ const DonorDashboard = () => {
       }
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
-      setError(err);
+      if (err?.response?.status === 404) {
+        setProfileMissing(true);
+        setError(null);
+      } else {
+        setError(err);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -202,6 +212,14 @@ const DonorDashboard = () => {
 
   // Error state
   if (error) return <ErrorState error={error} onRetry={fetchDashboardData} />;
+  if (profileMissing) {
+    return (
+      <DonorProfileRequired
+        title="Dashboard Needs Donor Profile"
+        description="Create your donor profile to view eligibility, donation activity, and matched requests."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 min-h-screen bg-base-200 p-6">

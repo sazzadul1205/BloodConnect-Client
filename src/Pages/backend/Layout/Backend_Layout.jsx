@@ -52,7 +52,8 @@ const navigationConfig = {
   hospital: [
     { name: "Dashboard", path: "/hospital/dashboard", icon: FiHome },
     { name: "Blood Banks", path: "/hospital/blood-banks", icon: FiMapPin },
-    { name: "Blood Requests", path: "/hospital/blood-requests", icon: FiDroplet },
+    { name: "Create Request", path: "/hospital/create-request", icon: FiPlusCircle },
+    { name: "My Requests", path: "/hospital/my-requests", icon: FiList },
     { name: "Donor Search", path: "/hospital/donor-search", icon: FiUser },
     { name: "Events", path: "/hospital/events", icon: FiCalendar },
     { name: "Settings", path: "/hospital/settings", icon: FiSettings },

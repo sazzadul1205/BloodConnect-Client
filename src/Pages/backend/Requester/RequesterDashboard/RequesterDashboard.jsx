@@ -2,7 +2,8 @@
 
 // React
 import { Link } from "react-router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -105,7 +106,6 @@ const safeString = (value) => {
 const RequesterDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { axiosInstance } = useAxiosPublic();
-  const token = localStorage.getItem("auth_token");
 
   // Get requester ID from user object
   const requesterId = useMemo(
@@ -113,25 +113,22 @@ const RequesterDashboard = () => {
     [user],
   );
 
-  // States
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [requester, setRequester] = useState(null);
-  const [bloodRequests, setBloodRequests] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
+  const {
+    data: dashboardData,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["requester-dashboard", requesterId],
+    enabled: !authLoading,
+    queryFn: async () => {
+      if (!requesterId) {
+        throw new Error("Requester ID not found. Please log in again.");
+      }
 
-  // Fetch all dashboard data
-  const fetchDashboardData = useCallback(async () => {
-    if (!requesterId) {
-      setError(new Error("Requester ID not found. Please log in again."));
-      setLoading(false);
-      return;
-    }
-
-    setRefreshing(true);
-    setError(null);
-
-    try {
+      const token = localStorage.getItem("auth_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
       // Fetch requester profile and blood requests in parallel
@@ -140,31 +137,21 @@ const RequesterDashboard = () => {
         axiosInstance.get("/blood-requests", { headers }),
       ]);
 
-      const requesterData = profileRes?.data?.data || null;
-      setRequester(requesterData);
-
-      // Filter requests for this requester
+      const requester = profileRes?.data?.data || null;
       const allRequests = requestsRes?.data?.data || [];
-      const myRequests = allRequests.filter(
-        request => String(getId(request.requesterId)) === String(requesterId)
+      const bloodRequests = allRequests.filter(
+        (request) => String(getId(request.requesterId)) === String(requesterId),
       );
-      setBloodRequests(myRequests);
 
-    } catch (err) {
-      console.error("Error fetching dashboard data:", err);
-      setError(err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [axiosInstance, requesterId, token]);
+      return { requester, bloodRequests };
+    },
+  });
 
-  // Initial data fetch
-  useEffect(() => {
-    if (!authLoading) {
-      fetchDashboardData();
-    }
-  }, [authLoading, fetchDashboardData]);
+  const requester = dashboardData?.requester || null;
+  const bloodRequests = useMemo(
+    () => dashboardData?.bloodRequests ?? [],
+    [dashboardData?.bloodRequests],
+  );
 
   // Calculate request statistics
   const requestStats = useMemo(() => {
@@ -290,10 +277,10 @@ const RequesterDashboard = () => {
   }, [bloodRequests]);
 
   // Loading state
-  if (loading || authLoading) return <BloodLoader />;
+  if (isLoading || authLoading) return <BloodLoader />;
 
   // Error state
-  if (error) return <ErrorState error={error} onRetry={fetchDashboardData} />;
+  if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
     <div className="space-y-6 min-h-screen bg-base-200 p-6">
@@ -328,12 +315,12 @@ const RequesterDashboard = () => {
           </Link>
           <button
             type="button"
-            onClick={fetchDashboardData}
+            onClick={() => refetch()}
             className="btn btn-sm btn-primary gap-2"
-            disabled={refreshing}
+            disabled={isFetching}
           >
-            <FiRefreshCw className={refreshing ? "animate-spin" : ""} />
-            {refreshing ? "Refreshing..." : "Refresh"}
+            <FiRefreshCw className={isFetching ? "animate-spin" : ""} />
+            {isFetching ? "Refreshing..." : "Refresh"}
           </button>
         </div>
       </div>
