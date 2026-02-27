@@ -50,6 +50,7 @@ import RequesterDashboard from './Pages/backend/Requester/RequesterDashboard/Req
 import HospitalBloodBanks from './Pages/backend/Hospital/HospitalBloodBanks/HospitalBloodBanks.jsx';
 import DonorSearch from './Pages/backend/Hospital/DonorSearch/DonorSearch.jsx';
 import HospitalSettings from './Pages/backend/Hospital/HospitalSettings/HospitalSettings.jsx';
+import HospitalDashboard from './Pages/backend/Hospital/HospitalDashboard/HospitalDashboard.jsx';
 
 
 // Create Query Client
@@ -107,7 +108,7 @@ createRoot(document.getElementById('root')).render(
             <Route element={<RequireRole allowedRoles={["hospital", "admin", "super_admin"]} />} >
               <Route element={<Backend_Layout userType="hospital" />}>
 
-                <Route path="/hospital/dashboard" element={<h1 className='text-black'>Hospital Dashboard</h1>} />
+                <Route path="/hospital/dashboard" element={<HospitalDashboard />} />
                 <Route path="/hospital/blood-banks" element={<HospitalBloodBanks />} />
                 <Route path="/hospital/create-request" element={<CreateRequest />} />
                 <Route path="/hospital/my-requests" element={<MyRequests />} />

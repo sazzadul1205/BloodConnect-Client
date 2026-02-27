@@ -1,11 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
-import { FiEye, FiMapPin, FiRefreshCw, FiSearch, FiUsers } from "react-icons/fi";
+import {
+  FiEye,
+  FiMapPin,
+  FiNavigation,
+  FiRefreshCw,
+  FiSearch,
+  FiUsers,
+} from "react-icons/fi";
 import { FaHospital } from "react-icons/fa";
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import useAuth from "../../../../hooks/useAuth";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import Pagination from "../../../../shared/Pagination";
+import ResultsCount from "../../../../shared/ResultsCount";
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const SEARCH_TYPES = ["eligible", "emergency", "nearby"];
@@ -25,10 +34,14 @@ const DonorSearch = () => {
   const [selectedDonor, setSelectedDonor] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState("");
+  const [inputError, setInputError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   const [filters, setFilters] = useState({
-    bloodType: "A+",
-    bloodGroup: "A+",
+    bloodType: "",
+    bloodGroup: "",
     city: "",
     longitude: "",
     latitude: "",
@@ -40,6 +53,26 @@ const DonorSearch = () => {
     () => (token ? { Authorization: `Bearer ${token}` } : {}),
     [token],
   );
+
+  const validateNearbyInput = useCallback((values) => {
+    const longitude = Number(values.longitude);
+    const latitude = Number(values.latitude);
+    const radius = Number(values.radius);
+
+    if (Number.isNaN(longitude) || Number.isNaN(latitude)) {
+      return "Longitude and latitude are required for nearby search.";
+    }
+    if (longitude < -180 || longitude > 180) {
+      return "Longitude must be between -180 and 180.";
+    }
+    if (latitude < -90 || latitude > 90) {
+      return "Latitude must be between -90 and 90.";
+    }
+    if (Number.isNaN(radius) || radius <= 0) {
+      return "Radius must be a positive number.";
+    }
+    return "";
+  }, []);
 
   const syncUrl = useCallback(
     (type, values) => {
@@ -65,8 +98,10 @@ const DonorSearch = () => {
     async (type, values) => {
       setLoading(true);
       setError(null);
+      setInputError("");
       setSelectedDonor(null);
       setProfileError("");
+      setCurrentPage(1);
 
       try {
         let endpoint = "";
@@ -74,21 +109,28 @@ const DonorSearch = () => {
 
         if (type === "eligible") {
           endpoint = "/donors/search/eligible";
-          params.set("bloodType", values.bloodType || "A+");
+          if (values.bloodType) params.set("bloodType", values.bloodType);
           if (values.city) params.set("city", values.city);
         }
 
         if (type === "emergency") {
           endpoint = "/donors/search/emergency";
-          params.set("bloodType", values.bloodType || "A+");
+          if (values.bloodType) params.set("bloodType", values.bloodType);
           if (values.city) params.set("city", values.city);
         }
 
         if (type === "nearby") {
+          const validationError = validateNearbyInput(values);
+          if (validationError) {
+            setInputError(validationError);
+            setDonors([]);
+            setLoading(false);
+            return;
+          }
           endpoint = "/users/nearby-donors";
-          params.set("longitude", values.longitude || "0");
-          params.set("latitude", values.latitude || "0");
-          params.set("radius", values.radius || "10000");
+          params.set("longitude", String(values.longitude));
+          params.set("latitude", String(values.latitude));
+          params.set("radius", String(values.radius || "10000"));
           if (values.bloodGroup) params.set("bloodGroup", values.bloodGroup);
         }
 
@@ -103,7 +145,7 @@ const DonorSearch = () => {
         setLoading(false);
       }
     },
-    [authHeaders, axiosInstance],
+    [authHeaders, axiosInstance, validateNearbyInput],
   );
 
   const readQueryDefaults = useCallback(() => {
@@ -120,9 +162,37 @@ const DonorSearch = () => {
   }, [location.search]);
 
   const handleSearch = useCallback(() => {
+    if (activeType === "nearby") {
+      const validationError = validateNearbyInput(filters);
+      if (validationError) {
+        setInputError(validationError);
+        return;
+      }
+    }
     syncUrl(activeType, filters);
     fetchDonors(activeType, filters);
-  }, [activeType, fetchDonors, filters, syncUrl]);
+  }, [activeType, fetchDonors, filters, syncUrl, validateNearbyInput]);
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      setInputError("Geolocation is not supported in this browser.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setInputError("");
+        setFilters((prev) => ({
+          ...prev,
+          latitude: position.coords.latitude.toFixed(6),
+          longitude: position.coords.longitude.toFixed(6),
+        }));
+      },
+      () => {
+        setInputError("Unable to read your location. Enter coordinates manually.");
+      },
+    );
+  };
 
   const openProfile = useCallback(
     async (donorId) => {
@@ -169,6 +239,43 @@ const DonorSearch = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, activeType, location.search]);
 
+  const normalizedDonors = useMemo(
+    () =>
+      donors.map((donor, idx) => {
+        const donorId = donor?.donorId || donor?._id || idx;
+        return {
+          raw: donor,
+          donorId,
+          fullName:
+            donor?.user?.profile?.fullName || donor?.profile?.fullName || "Donor",
+          bloodType:
+            donor?.medicalInfo?.bloodType || donor?.profile?.bloodGroup || "N/A",
+          city: donor?.user?.address?.city || donor?.address?.city || "N/A",
+          isEligible: Boolean(donor?.eligibility?.isEligible),
+          isEmergency: Boolean(
+            donor?.donationPreferences?.emergencyDonor ||
+              donor?.donationPreferences?.notifyForEmergency,
+          ),
+        };
+      }),
+    [donors],
+  );
+
+  const filteredDonors = useMemo(() => {
+    if (!searchTerm.trim()) return normalizedDonors;
+    const term = searchTerm.toLowerCase();
+    return normalizedDonors.filter((donor) =>
+      `${donor.fullName} ${donor.bloodType} ${donor.city}`
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [normalizedDonors, searchTerm]);
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedDonors = filteredDonors.slice(startIndex, endIndex);
+  const totalPages = Math.max(1, Math.ceil(filteredDonors.length / itemsPerPage));
+
   if (loading || authLoading) return <BloodLoader />;
   if (error) return <ErrorState error={error} onRetry={handleSearch} />;
 
@@ -198,6 +305,7 @@ const DonorSearch = () => {
               type="button"
               className={`btn btn-sm ${activeType === type ? "btn-error" : "btn-outline"}`}
               onClick={() => {
+                setInputError("");
                 syncUrl(type, filters);
                 fetchDonors(type, filters);
               }}
@@ -217,6 +325,7 @@ const DonorSearch = () => {
                   setFilters((prev) => ({ ...prev, bloodType: e.target.value }))
                 }
               >
+                <option value="">All Blood Types</option>
                 {BLOOD_TYPES.map((type) => (
                   <option key={type} value={type}>
                     {type}
@@ -271,12 +380,21 @@ const DonorSearch = () => {
                   setFilters((prev) => ({ ...prev, bloodGroup: e.target.value }))
                 }
               >
+                <option value="">All Blood Types</option>
                 {BLOOD_TYPES.map((type) => (
                   <option key={type} value={type}>
                     {type}
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                className="btn btn-outline gap-2"
+                onClick={useMyLocation}
+              >
+                <FiNavigation size={14} />
+                Use My Location
+              </button>
             </>
           )}
 
@@ -285,6 +403,7 @@ const DonorSearch = () => {
             Search
           </button>
         </div>
+        {inputError && <p className="text-error text-sm">{inputError}</p>}
       </div>
 
       <div className="stat bg-base-100 rounded-lg border border-base-300">
@@ -292,9 +411,35 @@ const DonorSearch = () => {
           <FiUsers size={22} />
         </div>
         <div className="stat-title">Results</div>
-        <div className="stat-value text-3xl">{donors.length}</div>
+        <div className="stat-value text-3xl">{filteredDonors.length}</div>
         <div className="stat-desc capitalize">{activeType} donor matches</div>
       </div>
+
+      <div className="bg-base-100 rounded-lg border border-base-300 p-4">
+        <input
+          type="text"
+          className="input input-bordered w-full"
+          placeholder="Filter results by name, blood type, or city..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setCurrentPage(1);
+          }}
+        />
+      </div>
+
+      {filteredDonors.length > 0 && (
+        <div className="bg-base-100 rounded-lg border border-base-300 p-4">
+          <ResultsCount
+            filteredUsers={filteredDonors}
+            itemsPerPage={itemsPerPage}
+            setItemsPerPage={setItemsPerPage}
+            startIndex={startIndex}
+            endIndex={endIndex}
+            setCurrentPage={setCurrentPage}
+          />
+        </div>
+      )}
 
       <div className="bg-base-100 rounded-lg border border-base-300 overflow-hidden">
         <div className="overflow-x-auto">
@@ -311,48 +456,35 @@ const DonorSearch = () => {
               </tr>
             </thead>
             <tbody>
-              {donors.length > 0 ? (
-                donors.map((donor, idx) => {
-                  const donorId = donor?.donorId || donor?._id;
-                  const fullName =
-                    donor?.user?.profile?.fullName ||
-                    donor?.profile?.fullName ||
-                    "Donor";
-                  const bloodType =
-                    donor?.medicalInfo?.bloodType || donor?.profile?.bloodGroup || "N/A";
-                  const city = donor?.user?.address?.city || donor?.address?.city || "N/A";
-                  const isEligible = donor?.eligibility?.isEligible;
-                  const isEmergency =
-                    donor?.donationPreferences?.emergencyDonor ||
-                    donor?.donationPreferences?.notifyForEmergency;
-
+              {paginatedDonors.length > 0 ? (
+                paginatedDonors.map((donor, idx) => {
                   return (
-                    <tr key={String(donorId || idx)}>
-                      <td>{idx + 1}</td>
-                      <td>{fullName}</td>
-                      <td>{bloodType}</td>
+                    <tr key={String(donor.donorId || idx)}>
+                      <td>{startIndex + idx + 1}</td>
+                      <td>{donor.fullName}</td>
+                      <td>{donor.bloodType}</td>
                       <td>
                         <span className="inline-flex items-center gap-1">
                           <FiMapPin size={12} />
-                          {city}
+                          {donor.city}
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${isEligible ? "badge-success" : "badge-warning"}`}>
-                          {isEligible ? "Yes" : "No"}
+                        <span className={`badge ${donor.isEligible ? "badge-success" : "badge-warning"}`}>
+                          {donor.isEligible ? "Yes" : "No"}
                         </span>
                       </td>
                       <td>
-                        <span className={`badge ${isEmergency ? "badge-info" : "badge-ghost"}`}>
-                          {isEmergency ? "Yes" : "No"}
+                        <span className={`badge ${donor.isEmergency ? "badge-info" : "badge-ghost"}`}>
+                          {donor.isEmergency ? "Yes" : "No"}
                         </span>
                       </td>
                       <td className="text-center">
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm btn-square"
-                          disabled={!donorId || profileLoading}
-                          onClick={() => openProfile(donorId)}
+                          disabled={!donor.donorId || profileLoading}
+                          onClick={() => openProfile(donor.donorId)}
                           title="View limited donor profile"
                         >
                           <FiEye size={16} />
@@ -364,7 +496,9 @@ const DonorSearch = () => {
               ) : (
                 <tr>
                   <td colSpan="7" className="text-center py-10 text-base-content/70">
-                    No donors found for this search.
+                    {donors.length > 0
+                      ? "No donors match your local filter."
+                      : "No donors found for this search."}
                   </td>
                 </tr>
               )}
@@ -372,6 +506,14 @@ const DonorSearch = () => {
           </table>
         </div>
       </div>
+
+      {filteredDonors.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <div className="bg-info/10 border border-info/20 rounded-lg p-4 text-sm">
         <p className="font-semibold text-info mb-1">Hospital Profile View:</p>
