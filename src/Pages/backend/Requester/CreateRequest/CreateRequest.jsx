@@ -23,6 +23,7 @@ import { FaHospital } from "react-icons/fa";
 
 // Hooks
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
+import useAuth from "../../../../hooks/useAuth";
 
 // Constants
 const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -63,8 +64,10 @@ const initialForm = {
 
 const CreateRequest = () => {
   const { axiosInstance } = useAxiosPublic();
+  const { user } = useAuth();
   const token = localStorage.getItem("auth_token");
   const navigate = useNavigate();
+  const isHospital = user?.role === "hospital";
 
   // States
   const [submitting, setSubmitting] = useState(false);
@@ -165,7 +168,7 @@ const CreateRequest = () => {
       });
 
       setForm(initialForm);
-      navigate("/requester/my-requests");
+      navigate(isHospital ? "/hospital/my-requests" : "/requester/my-requests");
     } catch (err) {
       await Swal.fire({
         title: "Request Failed",

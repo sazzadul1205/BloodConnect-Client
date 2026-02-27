@@ -32,6 +32,7 @@ import { FaHospital, FaHeartbeat, FaTint } from "react-icons/fa";
 
 // Hooks
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
+import useAuth from "../../../../hooks/useAuth";
 
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
@@ -86,9 +87,12 @@ const statusBadge = {
 
 const MyRequests = () => {
   const { axiosInstance } = useAxiosPublic();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const token = localStorage.getItem("auth_token");
   const [searchParams, setSearchParams] = useSearchParams();
+  const createRequestPath =
+    user?.role === "hospital" ? "/hospital/create-request" : "/requester/create-request";
 
   // Modal states
   const [selectedRequestId, setSelectedRequestId] = useState(null);
@@ -357,7 +361,7 @@ const MyRequests = () => {
           </button>
 
           <Link
-            to="/requester/create-request"
+            to={createRequestPath}
             className="btn btn-error btn-sm gap-2"
           >
             <FiPlus size={16} />
@@ -759,7 +763,7 @@ const MyRequests = () => {
                       Try adjusting your filters or create a new request
                     </p>
                     <Link
-                      to="/requester/create-request"
+                      to={createRequestPath}
                       className="btn btn-error btn-sm gap-2 mt-2"
                     >
                       <FiPlus size={16} />
