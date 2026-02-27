@@ -47,6 +47,9 @@ import MyRequests from './Pages/backend/Requester/MyRequests/MyRequests.jsx';
 import BloodBanks from './Pages/backend/Requester/BloodBanks/BloodBanks.jsx';
 import RequesterSettings from './Pages/backend/Requester/RequesterSettings/RequesterSettings.jsx';
 import RequesterDashboard from './Pages/backend/Requester/RequesterDashboard/RequesterDashboard.jsx';
+import HospitalBloodBanks from './Pages/backend/Hospital/HospitalBloodBanks/HospitalBloodBanks.jsx';
+import DonorSearch from './Pages/backend/Hospital/DonorSearch/DonorSearch.jsx';
+import HospitalSettings from './Pages/backend/Hospital/HospitalSettings/HospitalSettings.jsx';
 
 
 // Create Query Client
@@ -105,6 +108,13 @@ createRoot(document.getElementById('root')).render(
               <Route element={<Backend_Layout userType="hospital" />}>
 
                 <Route path="/hospital/dashboard" element={<h1 className='text-black'>Hospital Dashboard</h1>} />
+                <Route path="/hospital/blood-banks" element={<HospitalBloodBanks />} />
+                <Route path="/hospital/create-request" element={<CreateRequest />} />
+                <Route path="/hospital/my-requests" element={<MyRequests />} />
+                <Route path="/hospital/donor-search" element={<DonorSearch />} />
+                <Route path="/hospital/donor-search/:searchType" element={<DonorSearch />} />
+                <Route path="/hospital/events" element={<DonationEvents />} />
+                <Route path="/hospital/settings" element={<HospitalSettings />} />
               </Route>
             </Route>
 

@@ -1,5 +1,8 @@
+// Page/backend/Admin/BloodBanksManagement/ViewBloodBankModal/ViewBloodBankModal.jsx
+
 // React
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -29,39 +32,37 @@ import { FaDroplet } from "react-icons/fa6";
 
 // Hooks
 import BloodLoader from "../../../../../shared/BloodLoader";
+import ErrorState from "../../../../../shared/ErrorState";
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 
 const ViewBloodBankModal = ({ bankId, onClose }) => {
   const { axiosInstance } = useAxiosPublic();
 
   // States
-  const [loading, setLoading] = useState(true);
-  const [bankData, setBankData] = useState(null);
   const [activeTab, setActiveTab] = useState("overview"); // overview, contact, inventory, staff, verification
 
-  // Fetch bank data on mount
-  useEffect(() => {
-    const fetchBankData = async () => {
-      if (!bankId) return;
+  const {
+    data: bankData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["blood-bank-details", bankId],
+    enabled: Boolean(bankId),
+    queryFn: async () => {
+      const token = localStorage.getItem("auth_token");
+      const response = await axiosInstance.get(`/blood-banks/${bankId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
 
-      setLoading(true);
-      try {
-        const response = await axiosInstance.get(`/blood-banks/${bankId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
-        });
-
-        if (response.data?.success) {
-          setBankData(response.data.data);
-        }
-      } catch (error) {
-        console.error("Error fetching bank data:", error);
-      } finally {
-        setLoading(false);
+      if (!response.data?.success) {
+        throw new Error("Failed to load blood bank details.");
       }
-    };
 
-    fetchBankData();
-  }, [bankId, axiosInstance]);
+      return response.data.data;
+    },
+  });
 
   // Format date
   const formatDate = (dateString) => {
@@ -147,7 +148,8 @@ const ViewBloodBankModal = ({ bankId, onClose }) => {
     return colorMap[color] || "badge-ghost";
   };
 
-  if (loading) return <BloodLoader fullscreen={false} />;
+  if (isLoading) return <BloodLoader fullscreen={false} />;
+  if (isError) return <ErrorState error={error} onRetry={refetch} />;
   if (!bankData) return null;
 
   const bank = bankData;

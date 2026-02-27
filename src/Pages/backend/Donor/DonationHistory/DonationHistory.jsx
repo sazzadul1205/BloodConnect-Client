@@ -35,6 +35,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
 import DonationDetailsModal from "./DonationDetailsModal/DonationDetailsModal";
+import DonorProfileRequired from "../../../../shared/DonorProfileRequired";
 
 // Constants
 const donationTypes = [
@@ -73,6 +74,7 @@ const DonationHistory = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [profileMissing, setProfileMissing] = useState(false);
   const [donor, setDonor] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState(null);
@@ -97,13 +99,19 @@ const DonationHistory = () => {
 
     setLoading(true);
     setError(null);
+    setProfileMissing(false);
     try {
       const res = await axiosInstance.get(`/donors/${donorId}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       setDonor(res.data?.data || null);
     } catch (err) {
-      setError(err);
+      if (err?.response?.status === 404) {
+        setProfileMissing(true);
+        setError(null);
+      } else {
+        setError(err);
+      }
     } finally {
       setLoading(false);
     }
@@ -266,6 +274,14 @@ const DonationHistory = () => {
 
   // Error state
   if (error) return <ErrorState error={error} onRetry={fetchHistory} />;
+  if (profileMissing) {
+    return (
+      <DonorProfileRequired
+        title="Donation History Needs Donor Profile"
+        description="Create your donor profile first, then your donations and eligibility timeline will appear here."
+      />
+    );
+  }
 
   const history = donor?.donationHistory || [];
 

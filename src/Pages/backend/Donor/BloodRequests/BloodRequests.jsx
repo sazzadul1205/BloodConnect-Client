@@ -39,6 +39,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import DonorProfileRequired from "../../../../shared/DonorProfileRequired";
 
 // Constants
 const responseOptions = [
@@ -90,6 +91,7 @@ const BloodRequests = () => {
   const [responding, setResponding] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [donorBloodType, setDonorBloodType] = useState("");
+  const [profileMissing, setProfileMissing] = useState(false);
 
   // Form state for response
   const [respondForm, setRespondForm] = useState({
@@ -108,7 +110,12 @@ const BloodRequests = () => {
         });
         const bloodType = res?.data?.data?.medicalInfo?.bloodType || "";
         setDonorBloodType(bloodType);
-      } catch {
+        setProfileMissing(false);
+      } catch (err) {
+        if (err?.response?.status === 404) {
+          setProfileMissing(true);
+          setError(null);
+        }
         setDonorBloodType("");
       }
     };
@@ -269,6 +276,14 @@ const BloodRequests = () => {
 
   // Error state
   if (error) return <ErrorState error={error} onRetry={fetchPendingRequests} />;
+  if (profileMissing) {
+    return (
+      <DonorProfileRequired
+        title="Blood Requests Need Donor Profile"
+        description="Create your donor profile so we can match requests using your blood type."
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 min-h-screen bg-base-200 p-6">
