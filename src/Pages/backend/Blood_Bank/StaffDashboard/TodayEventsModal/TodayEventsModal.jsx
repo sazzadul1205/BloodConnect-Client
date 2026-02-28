@@ -11,10 +11,6 @@ import { motion } from "framer-motion";
 import {
   FaTimes,
   FaCalendarAlt,
-  FaClock,
-  FaMapMarkerAlt,
-  FaUsers,
-  FaUser,
   FaHeartbeat,
   FaAmbulance,
   FaSearch,
@@ -23,9 +19,6 @@ import {
   FiCalendar,
   FiClock,
   FiMapPin,
-  FiUsers,
-  FiUser,
-  FiDroplet,
 } from "react-icons/fi";
 
 // Helper function to extract ID
@@ -80,7 +73,7 @@ const eventTypeConfig = {
   },
 };
 
-const TodayEventsModal = ({ events, onClose }) => {
+const TodayEventsModal = ({ events = [], onClose }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState("");

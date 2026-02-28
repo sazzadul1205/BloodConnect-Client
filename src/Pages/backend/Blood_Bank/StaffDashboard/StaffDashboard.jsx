@@ -179,6 +179,7 @@ const StaffDashboard = () => {
     data: myBankData,
     isLoading: myBankLoading,
     isError: myBankError,
+    refetch: refetchMyBank,
   } = useQuery({
     queryKey: ["my-blood-bank-staff-dashboard", userId, user?.role],
     enabled: !authLoading && isBloodBankUser && !!userId,
@@ -276,8 +277,9 @@ const StaffDashboard = () => {
       const staffWithDetails = await Promise.all(
         staffList.map(async (staffMember) => {
           try {
+            const staffUserId = getId(staffMember.userId);
             const userRes = await axiosInstance.get(
-              `/users/profile/${staffMember.userId}`,
+              `/users/profile/${staffUserId}`,
               { headers: authHeaders }
             );
             return {
@@ -285,7 +287,7 @@ const StaffDashboard = () => {
               user: userRes.data?.data || null,
             };
           } catch (error) {
-            console.error(`Error fetching staff user ${staffMember.userId}:`, error);
+            console.error(`Error fetching staff user ${getId(staffMember.userId)}:`, error);
             return {
               ...staffMember,
               user: null,
@@ -344,7 +346,7 @@ const StaffDashboard = () => {
     }, 0);
 
     // Get pending check-ins (donors with status "registered")
-    const pendingCheckIns = events.flatMap(event =>
+    const pendingCheckins = events.flatMap(event =>
       (event.registeredDonors || [])
         .filter(donor => donor.status === "registered")
         .map(donor => ({
@@ -369,8 +371,8 @@ const StaffDashboard = () => {
     return {
       totalEvents,
       registeredToday,
-      pendingCheckIns,
-      pendingCount: pendingCheckIns.length,
+      pendingCheckins,
+      pendingCount: pendingCheckins.length,
       checkedInToday,
       completedToday,
     };
@@ -391,6 +393,7 @@ const StaffDashboard = () => {
       const latestBankData = bankResult?.data || bankData || null;
 
       await Promise.allSettled([
+        refetchMyBank(),
         refetchStats(),
         refetchTodayEvents(),
         fetchStaffDetails(latestBankData?.staff),
@@ -404,7 +407,7 @@ const StaffDashboard = () => {
   const CloseModal = () => {
     setSelectedStaff(null);
     document.getElementById('staff_details_modal')?.close();
-    document.getElementById('pending_checkIns_modal')?.close();
+    document.getElementById('pending_checkins_modal')?.close();
     document.getElementById('today_events_modal')?.close();
   };
 
@@ -554,7 +557,7 @@ const StaffDashboard = () => {
           </div>
           <p className="stat-title">Recent Donations</p>
           <p className="stat-value text-3xl">{recentDonations.length}</p>
-          <p className="stat-desc">Last 24 hours</p>
+          <p className="stat-desc">Latest records</p>
         </motion.div>
       </motion.div>
 
@@ -638,7 +641,7 @@ const StaffDashboard = () => {
 
           {todayStats.pendingCount > 0 ? (
             <div className="divide-y divide-base-300 max-h-80 overflow-y-auto">
-              {todayStats.pendingCheckIns.slice(0, 5).map((donor, index) => (
+              {todayStats.pendingCheckins.slice(0, 5).map((donor, index) => (
                 <div key={index} className="p-4 hover:bg-base-200 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="avatar placeholder">
@@ -677,7 +680,7 @@ const StaffDashboard = () => {
             <div className="p-4 border-t border-base-300">
               <button
                 onClick={() => {
-                  document.getElementById('pending_checkIns_modal')?.showModal();
+                  document.getElementById('pending_checkins_modal')?.showModal();
                 }}
                 className="btn btn-sm btn-outline w-full gap-2"
               >
@@ -743,7 +746,7 @@ const StaffDashboard = () => {
 
                   return (
                     <motion.tr
-                      key={staff.userId}
+                      key={getId(staff.userId)}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: 0.25 + index * 0.02 }}
@@ -761,7 +764,7 @@ const StaffDashboard = () => {
                               {user.profile?.fullName || "Unknown"}
                             </p>
                             <p className="text-xs text-base-content/70">
-                              ID: {staff.userId?.slice(-8)}
+                              ID: {getId(staff.userId)?.slice(-8) || "N/A"}
                             </p>
                           </div>
                         </div>
@@ -943,9 +946,9 @@ const StaffDashboard = () => {
         </form>
       </dialog>
 
-      <dialog id="pending_checkIns_modal" className="modal">
+      <dialog id="pending_checkins_modal" className="modal">
         <PendingCheckInsModal
-          pendingCheckIns={todayStats.pendingCheckIns}
+          pendingCheckIns={todayStats.pendingCheckins}
           onClose={CloseModal}
         />
         <form onClick={CloseModal} method="dialog" className="modal-backdrop">

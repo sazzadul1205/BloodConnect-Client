@@ -55,6 +55,7 @@ import BankProfile from './Pages/backend/Blood_Bank/BankProfile/BankProfile.jsx'
 import InventoryManagement from './Pages/backend/Blood_Bank/InventoryManagement/InventoryManagement.jsx';
 import EventsManagement from './Pages/backend/Blood_Bank/EventsManagement/EventsManagement.jsx';
 import StaffDashboard from './Pages/backend/Blood_Bank/StaffDashboard/StaffDashboard.jsx';
+import BloodBankSettings from './Pages/backend/Blood_Bank/BloodBankSettings/BloodBankSettings.jsx';
 
 
 // Create Query Client
@@ -132,6 +133,7 @@ createRoot(document.getElementById('root')).render(
                 <Route path="/blood_bank/inventory-management" element={<InventoryManagement />} />
                 <Route path="/blood_bank/events-management" element={<EventsManagement />} />
                 <Route path="/blood_bank/staff-dashboard" element={<StaffDashboard />} />
+                <Route path="/blood_bank/settings" element={<BloodBankSettings />} />
               </Route>
             </Route>
 

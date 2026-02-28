@@ -32,6 +32,14 @@ const formatTime = (value) => {
   }
 };
 
+const getId = (value) => {
+  if (!value) return null;
+  if (typeof value === "object") {
+    return value?.$oid || value?.toString?.() || JSON.stringify(value);
+  }
+  return String(value);
+};
+
 const PendingCheckInsModal = ({ pendingCheckIns, onClose }) => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -113,7 +121,7 @@ const PendingCheckInsModal = ({ pendingCheckIns, onClose }) => {
           <div className="space-y-3">
             {filteredCheckIns.map((donor, index) => (
               <motion.div
-                key={index}
+                key={`${getId(donor.eventId) || "event"}-${getId(donor.donorId) || donor.donorName || index}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
@@ -143,7 +151,8 @@ const PendingCheckInsModal = ({ pendingCheckIns, onClose }) => {
 
                   <button
                     onClick={() => {
-                      navigate(`/blood_bank/events-management?event=${donor.eventId}`);
+                      const eventId = getId(donor.eventId);
+                      navigate(`/blood_bank/events-management${eventId ? `?event=${eventId}` : ""}`);
                     }}
                     className="btn btn-sm btn-warning gap-2"
                   >
