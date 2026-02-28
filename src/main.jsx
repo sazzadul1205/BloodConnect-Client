@@ -51,6 +51,8 @@ import HospitalBloodBanks from './Pages/backend/Hospital/HospitalBloodBanks/Hosp
 import DonorSearch from './Pages/backend/Hospital/DonorSearch/DonorSearch.jsx';
 import HospitalSettings from './Pages/backend/Hospital/HospitalSettings/HospitalSettings.jsx';
 import HospitalDashboard from './Pages/backend/Hospital/HospitalDashboard/HospitalDashboard.jsx';
+import BankProfile from './Pages/backend/Blood_Bank/BankProfile/BankProfile.jsx';
+import InventoryManagement from './Pages/backend/Blood_Bank/InventoryManagement/InventoryManagement.jsx';
 
 
 // Create Query Client
@@ -124,6 +126,8 @@ createRoot(document.getElementById('root')).render(
               <Route element={<Backend_Layout userType="blood_bank" />}>
 
                 <Route path="/blood_bank/dashboard" element={<h1 className='text-black'>Blood Bank Dashboard</h1>} />
+                <Route path="/blood_bank/bank-profile" element={<BankProfile />} />
+                <Route path="/blood_bank/inventory-management" element={<InventoryManagement />} />
               </Route>
             </Route>
 

@@ -3,6 +3,7 @@
 // React
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router";
 
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -54,6 +55,8 @@ import { showExportOptions } from "./BloodBanksExport";
 const BloodBanksManagement = () => {
   const queryClient = useQueryClient();
   const { axiosInstance } = useAxiosPublic();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Token
   const token = localStorage.getItem("auth_token");
@@ -401,6 +404,26 @@ const BloodBanksManagement = () => {
     setCurrentPage(1);
   }, [searchTerm, selectedType, selectedCity, verificationStatus, showLowInventory]);
 
+  // Open Add Blood Bank modal when redirected with ?openCreate=1
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldOpenCreate = params.get("openCreate") === "1";
+    if (!shouldOpenCreate) return;
+
+    document.getElementById("add_bank_modal")?.showModal();
+
+    // Clean up URL query so modal doesn't reopen on refresh/navigation.
+    params.delete("openCreate");
+    const nextSearch = params.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+      },
+      { replace: true },
+    );
+  }, [location.pathname, location.search, navigate]);
+
   // Close modals helper
   const CloseModal = () => {
     setSelectedBankId(null);
@@ -411,6 +434,14 @@ const BloodBanksManagement = () => {
     document.getElementById('inventory_modal')?.close();
   };
 
+  // Refresh helper for modal actions (avoids unnecessary low-inventory fetches)
+  const refreshManagementData = async () => {
+    await refetchBanks();
+    if (showLowInventory) {
+      await refetchLowInventory();
+    }
+  };
+
   // Loading state
   if (loadingBanks || loadingLowInventory) return <BloodLoader />;
 
@@ -419,7 +450,7 @@ const BloodBanksManagement = () => {
     return (
       <ErrorState
         error={[banksErrorData, lowInventoryErrorData]}
-        onRetry={() => refetchBanks() && refetchLowInventory()}
+        onRetry={() => refreshManagementData()}
       />
     );
   }
@@ -948,7 +979,7 @@ const BloodBanksManagement = () => {
       <dialog id="add_bank_modal" className="modal">
         <AddBloodBankModal
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks() && refetchLowInventory()}
+          refreshBanks={() => refreshManagementData()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
@@ -960,7 +991,7 @@ const BloodBanksManagement = () => {
         <EditBloodBankModal
           bankId={selectedBankId}
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks() && refetchLowInventory()}
+          refreshBanks={() => refreshManagementData()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
@@ -983,7 +1014,7 @@ const BloodBanksManagement = () => {
         <InventoryModal
           bankId={selectedBankId}
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks() && refetchLowInventory()}
+          refreshBanks={() => refreshManagementData()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
@@ -995,7 +1026,7 @@ const BloodBanksManagement = () => {
         <StaffModal
           bankId={selectedBankId}
           onClose={() => CloseModal()}
-          refreshBanks={() => refetchBanks() && refetchLowInventory()}
+          refreshBanks={() => refreshManagementData()}
         />
         <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
           <button>close</button>
