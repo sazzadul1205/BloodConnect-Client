@@ -46,15 +46,9 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
 import { formatAppDate, formatAppTime } from "../../../../utils/dateFormat";
-
-// Helper function to extract ID from MongoDB ObjectId
-const getId = (value) => {
-  if (!value) return null;
-  if (typeof value === "object") {
-    return value?.$oid || value?.toString?.() || JSON.stringify(value);
-  }
-  return String(value);
-};
+import { getId } from "../../../../utils/id";
+import { safeString } from "../../../../utils/string";
+import { getUserId } from "../../../../utils/user";
 
 // Format date for display
 const formatDate = (value) => {
@@ -77,22 +71,13 @@ const urgencyColors = {
   normal: "info",
 };
 
-// Safe string render function to prevent object rendering errors
-const safeString = (value) => {
-  if (value === null || value === undefined) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  if (typeof value === "boolean") return String(value);
-  return ""; // Return empty string for objects/arrays
-};
-
 const HospitalDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { axiosInstance } = useAxiosPublic();
 
   // Get hospital ID from user object
   const hospitalId = useMemo(
-    () => user?.userId || user?._id || user?.id || user?.uid,
+    () => getUserId(user),
     [user],
   );
 
