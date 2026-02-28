@@ -42,6 +42,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
 import DonorProfileRequired from "../../../../shared/DonorProfileRequired";
+import { formatAppDate, formatAppDateTime } from "../../../../utils/dateFormat";
 
 // Helper function to extract ID from MongoDB ObjectId
 const getId = (value) =>
@@ -49,26 +50,12 @@ const getId = (value) =>
 
 // Format date for display
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  const date = new Date(value?.$date || value);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return formatAppDate(value);
 };
 
 // Format date with time
 const formatDateTime = (value) => {
-  if (!value) return "N/A";
-  const date = new Date(value?.$date || value);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatAppDateTime(value);
 };
 
 // Urgency colors mapping

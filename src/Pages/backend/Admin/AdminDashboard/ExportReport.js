@@ -1,24 +1,10 @@
 import Swal from "sweetalert2";
+import { formatAppDateTime, formatDateInputValue } from "../../../../utils/dateFormat";
 
-const getCurrentDate = () => new Date().toISOString().split("T")[0];
+const getCurrentDate = () => formatDateInputValue(new Date());
 
 const formatTimestamp = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "N/A";
-    return date.toLocaleString("en-US", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppDateTime(value, "yyyy-MM-dd HH:mm:ss");
 };
 
 const sanitizeCell = (cell) => {

@@ -1,16 +1,10 @@
 import Swal from "sweetalert2";
 import { FiDownload } from "react-icons/fi";
+import { formatAppDate, formatDateInputValue } from "../../../../utils/dateFormat";
 
 // Format date for export (YYYY-MM-DD)
 export const formatDateForExport = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "N/A";
-    return date.toISOString().split("T")[0];
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(dateString, "yyyy-MM-dd");
 };
 
 // Export users to CSV
@@ -143,7 +137,7 @@ export const exportToCSV = async (users, activeTab, setIsExporting) => {
     const url = URL.createObjectURL(blob);
 
     // Generate filename with current date and filter info
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filterInfo = activeTab !== "all" ? `-${activeTab}` : "";
     const filename = `users-export${filterInfo}-${date}.csv`;
 
@@ -287,7 +281,7 @@ export const exportToJSON = async (users, activeTab, setIsExporting) => {
     const url = URL.createObjectURL(blob);
 
     // Generate filename
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filterInfo = activeTab !== "all" ? `-${activeTab}` : "";
     const filename = `users-export${filterInfo}-${date}.json`;
 

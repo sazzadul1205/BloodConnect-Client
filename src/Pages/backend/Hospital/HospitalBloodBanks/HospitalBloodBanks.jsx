@@ -43,6 +43,7 @@ import BloodLoader from "../../../../shared/BloodLoader";
 import Pagination from "../../../../shared/Pagination";
 import ResultsCount from "../../../../shared/ResultsCount";
 import ViewBloodBankModal from "../../Admin/BloodBanksManagement/ViewBloodBankModal/ViewBloodBankModal";
+import { formatAppDate } from "../../../../utils/dateFormat";
 
 // Modals
 
@@ -53,13 +54,7 @@ const getId = (value) =>
 
 // Format date and time for display
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  const date = new Date(value?.$date || value);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  return formatAppDate(value);
 };
 
 // Bank type configuration

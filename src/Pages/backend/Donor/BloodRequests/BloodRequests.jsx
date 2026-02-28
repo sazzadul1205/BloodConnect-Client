@@ -40,6 +40,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
 import DonorProfileRequired from "../../../../shared/DonorProfileRequired";
+import { formatAppDateTime } from "../../../../utils/dateFormat";
 
 // Constants
 const responseOptions = [
@@ -260,15 +261,7 @@ const BloodRequests = () => {
 
   // Format date for display
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatAppDateTime(dateString);
   };
 
   // Loading state

@@ -20,6 +20,7 @@ import {
   FiClock,
   FiMapPin,
 } from "react-icons/fi";
+import { formatAppTime } from "../../../../../utils/dateFormat";
 
 // Helper function to extract ID
 const getId = (value) => {
@@ -32,17 +33,7 @@ const getId = (value) => {
 
 // Format time
 const formatTime = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppTime(value);
 };
 
 // Event type config

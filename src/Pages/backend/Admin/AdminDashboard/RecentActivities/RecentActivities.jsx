@@ -1,6 +1,7 @@
 // Pages/backend/Admin/Dashboard/RecentActivities/RecentActivities.jsx
 
 import React from "react";
+import { formatDistanceToNow } from "date-fns";
 
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
@@ -46,24 +47,12 @@ const RecentActivities = ({ data, isLoading }) => {
 
   // Format timestamp
   const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
+    if (!timestamp) return "N/A";
+    const date = new Date(timestamp?.$date || timestamp);
+    if (Number.isNaN(date.getTime())) return "N/A";
 
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? "s" : ""} ago`;
-    if (diffHours < 24)
-      return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
-    if (diffDays === 1) return "Yesterday";
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const relative = formatDistanceToNow(date, { addSuffix: true });
+    return relative === "less than a minute ago" ? "Just now" : relative;
   };
 
   // Render component

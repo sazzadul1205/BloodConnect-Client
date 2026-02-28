@@ -41,6 +41,7 @@ import Pagination from "../../../../shared/Pagination";
 import ErrorState from "../../../../shared/ErrorState";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ResultsCount from "../../../../shared/ResultsCount";
+import { formatAppDate } from "../../../../utils/dateFormat";
 
 // Modals
 import StaffModal from "./StaffModal/StaffModal";
@@ -204,13 +205,7 @@ const BloodBanksManagement = () => {
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatAppDate(dateString);
   };
 
   // Get verification badge

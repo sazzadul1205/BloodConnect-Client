@@ -20,6 +20,7 @@ import { FiAlertCircle, FiDroplet } from "react-icons/fi";
 
 // Shared
 import BloodLoader from "../../../../../shared/BloodLoader";
+import { formatAppDateTime } from "../../../../../utils/dateFormat";
 
 // Hooks
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
@@ -53,15 +54,7 @@ const ViewRequestModal = ({ requestId, onClose }) => {
   }, [requestId, axiosInstance]);
 
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return formatAppDateTime(dateString, "MMMM d, yyyy p", "N/A");
   };
 
   const getUrgencyColor = (urgency) => {

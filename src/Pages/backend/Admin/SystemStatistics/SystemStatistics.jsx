@@ -59,6 +59,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
+import { formatAppDate, formatAppTime } from "../../../../utils/dateFormat";
 
 const SystemStatistics = () => {
   const { axiosInstance } = useAxiosPublic();
@@ -723,7 +724,7 @@ const SystemStatistics = () => {
                         </div>
                       </div>
                       <span className="text-sm opacity-50">
-                        {activity.timestamp ? new Date(activity.timestamp).toLocaleTimeString() : ''}
+                        {activity.timestamp ? formatAppTime(activity.timestamp) : ''}
                       </span>
                     </div>
                   ))
@@ -841,7 +842,7 @@ const SystemStatistics = () => {
                         </div>
                       </div>
                       <span className="text-xs opacity-50">
-                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : ''}
+                        {user.createdAt ? formatAppDate(user.createdAt) : ''}
                       </span>
                     </div>
                   ))}

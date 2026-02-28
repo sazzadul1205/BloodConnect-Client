@@ -21,6 +21,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
 import ChangePasswordModal from "../../Admin/UsersManagement/ChangePasswordModal/ChangePasswordModal";
+import { formatDateInputValue } from "../../../../utils/dateFormat";
 
 const emptyForm = {
   fullName: "",
@@ -70,7 +71,7 @@ const MyProfile = () => {
     setForm({
       fullName: profileData?.profile?.fullName || "",
       dateOfBirth: profileData?.profile?.dateOfBirth
-        ? new Date(profileData.profile.dateOfBirth).toISOString().slice(0, 10)
+        ? formatDateInputValue(profileData.profile.dateOfBirth)
         : "",
       gender: profileData?.profile?.gender || "",
       bloodGroup: profileData?.profile?.bloodGroup || "",

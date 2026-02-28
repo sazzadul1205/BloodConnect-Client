@@ -1,19 +1,10 @@
 // Pages/frontend/Requester/BloodBanks/utils.js
 
+import { formatAppDate } from "../../../../utils/dateFormat";
+
 // Format date
 export const formatDate = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "N/A";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(dateString, "MMM d, yyyy", "N/A");
 };
 
 // Calculate distance between two coordinates (Haversine formula)

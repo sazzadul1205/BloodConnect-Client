@@ -48,6 +48,7 @@ import ErrorState from "../../../../shared/ErrorState";
 import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 import useAuth from "../../../../hooks/useAuth";
 import BloodLoader from "../../../../shared/BloodLoader";
+import { formatAppDate } from "../../../../utils/dateFormat";
 
 const DonorProfile = () => {
   const { axiosInstance } = useAxiosPublic();
@@ -232,12 +233,7 @@ const DonorProfile = () => {
   };
   // Helper function to format date
   const formatDate = (date) => {
-    if (!date) return "Not available";
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
+    return formatAppDate(date, "MMMM d, yyyy", "Not available");
   };
 
   // Format MongoDB date
@@ -496,8 +492,10 @@ const DonorProfile = () => {
               <div className="stat-title text-sm">Next Eligible</div>
               <div className="stat-value text-2xl text-success">
                 {donor?.eligibility?.nextEligibleDate ?
-                  new Date(donor.eligibility.nextEligibleDate.$date || donor.eligibility.nextEligibleDate)
-                    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) :
+                  formatAppDate(
+                    donor.eligibility.nextEligibleDate.$date || donor.eligibility.nextEligibleDate,
+                    "MMM d",
+                  ) :
                   'Now'}
               </div>
               <div className="stat-desc text-xs">

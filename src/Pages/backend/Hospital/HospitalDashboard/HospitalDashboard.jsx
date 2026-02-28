@@ -45,6 +45,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import { formatAppDate, formatAppTime } from "../../../../utils/dateFormat";
 
 // Helper function to extract ID from MongoDB ObjectId
 const getId = (value) => {
@@ -57,19 +58,7 @@ const getId = (value) => {
 
 // Format date for display
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
-    return "Invalid Date";
-  }
+  return formatAppDate(value);
 };
 
 // Status colors mapping
@@ -840,7 +829,7 @@ const HospitalDashboard = () => {
       {/* Footer Note */}
       <div className="text-xs text-center text-base-content/60 flex items-center justify-center gap-2">
         <FaShieldAlt className="inline" />
-        Your hospital data is updated in real-time. Last updated: {new Date().toLocaleTimeString()}
+        Your hospital data is updated in real-time. Last updated: {formatAppTime(new Date())}
       </div>
     </div>
   );

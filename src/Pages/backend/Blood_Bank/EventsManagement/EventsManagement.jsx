@@ -49,6 +49,7 @@ import EditEventModal from "./EditEventModal/EditEventModal";
 import ViewEventModal from "./ViewEventModal/ViewEventModal";
 import CheckInModal from "./CheckInModal/CheckInModal";
 import DonorListModal from "./DonorListModal/DonorListModal";
+import { formatAppDate } from "../../../../utils/dateFormat";
 
 // Utils
 import { showExportOptions } from "./eventExport";
@@ -64,18 +65,7 @@ const getId = (value) => {
 
 // Format date for display
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(value);
 };
 
 // Event type configuration

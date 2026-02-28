@@ -12,6 +12,7 @@ import {
   FiCalendar,
   FiMail,
 } from "react-icons/fi";
+import { formatAppDate } from "../../../../../utils/dateFormat";
 
 const getId = (value) => {
   if (!value) return null;
@@ -181,14 +182,14 @@ const StaffDetailsModal = ({ staff, onClose }) => {
               <div>
                 <p className="text-sm opacity-70">Joined</p>
                 <p className="font-medium">
-                  {new Date(user.createdAt).toLocaleDateString()}
+                  {formatAppDate(user.createdAt)}
                 </p>
               </div>
               <div>
                 <p className="text-sm opacity-70">Last Active</p>
                 <p className="font-medium">
                   {user.stats?.lastActive
-                    ? new Date(user.stats.lastActive).toLocaleDateString()
+                    ? formatAppDate(user.stats.lastActive)
                     : "N/A"}
                 </p>
               </div>

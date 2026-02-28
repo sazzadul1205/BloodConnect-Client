@@ -9,6 +9,7 @@ import { FiTrendingUp } from "react-icons/fi";
 
 // Shared
 import BloodLoader from "../../../../../shared/BloodLoader";
+import { formatAppDate } from "../../../../../utils/dateFormat";
 
 const ActivityChart = ({ data, isLoading }) => {
 
@@ -78,7 +79,7 @@ const ActivityChart = ({ data, isLoading }) => {
       <div className="flex justify-between mt-2 text-xs text-base-content/50">
         {safeData.slice(0, 7).map((item, index) => (
           <span key={item._id || index}>
-            {new Date(item._id).toLocaleDateString("en-US", { weekday: "short" })}
+            {formatAppDate(item._id, "EEE")}
           </span>
         ))}
         {safeData.length > 7 && <span>...</span>}

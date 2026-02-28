@@ -39,6 +39,7 @@ import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
 import Pagination from "../../../../shared/Pagination";
 import ResultsCount from "../../../../shared/ResultsCount";
+import { formatAppDate } from "../../../../utils/dateFormat";
 
 // Modals
 import ViewRequestModal from "./ViewRequestModal/ViewRequestModal";
@@ -188,14 +189,7 @@ const MyRequests = () => {
 
   // Date formatter
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return "N/A";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatAppDate(dateString, "MMM d, yyyy", "N/A");
   };
 
   // Handle status update from modal

@@ -30,6 +30,7 @@ import { FiCalendar, FiClock, FiMapPin, FiUsers, FiDroplet } from "react-icons/f
 // Hooks
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../../shared/BloodLoader";
+import { formatDateInputValue } from "../../../../../utils/dateFormat";
 
 const EditEventModal = ({ eventId, onClose, refreshEvents }) => {
   const { axiosInstance } = useAxiosPublic();
@@ -113,10 +114,10 @@ const EditEventModal = ({ eventId, onClose, refreshEvents }) => {
 
           // Format dates for input fields
           const startDate = event.schedule?.startDate
-            ? new Date(event.schedule.startDate).toISOString().split('T')[0]
+            ? formatDateInputValue(event.schedule.startDate)
             : "";
           const endDate = event.schedule?.endDate
-            ? new Date(event.schedule.endDate).toISOString().split('T')[0]
+            ? formatDateInputValue(event.schedule.endDate)
             : "";
 
           // Populate form

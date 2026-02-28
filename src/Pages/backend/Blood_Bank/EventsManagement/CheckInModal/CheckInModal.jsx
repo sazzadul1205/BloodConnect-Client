@@ -25,6 +25,7 @@ import { FiUser, FiClock, FiDroplet } from "react-icons/fi";
 // Hooks
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../../shared/BloodLoader";
+import { formatAppTime } from "../../../../../utils/dateFormat";
 
 const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
   const { axiosInstance } = useAxiosPublic();
@@ -283,7 +284,7 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
                             </span>
                             <span className="flex items-center gap-1">
                               <FiClock size={12} className="opacity-50" />
-                              {new Date(donor.registrationDate).toLocaleTimeString()}
+                              {formatAppTime(donor.registrationDate)}
                             </span>
                           </div>
                         </div>

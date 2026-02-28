@@ -31,6 +31,7 @@ import {
 // Hooks
 import BloodLoader from "../../../../../shared/BloodLoader";
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
+import { formatAppDate, formatAppDateTime } from "../../../../../utils/dateFormat";
 
 const ViewUserModal = ({ userId, onClose }) => {
   const { axiosInstance } = useAxiosPublic();
@@ -66,34 +67,12 @@ const ViewUserModal = ({ userId, onClose }) => {
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    } catch {
-      return "N/A";
-    }
+    return formatAppDate(dateString, "MMMM d, yyyy");
   };
 
   // Format datetime
   const formatDateTime = (dateString) => {
-    if (!dateString) return "N/A";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "N/A";
-    }
+    return formatAppDateTime(dateString, "MMMM d, yyyy p");
   };
 
   // Get role icon and color

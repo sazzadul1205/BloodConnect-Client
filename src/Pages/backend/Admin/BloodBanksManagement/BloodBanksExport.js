@@ -1,15 +1,9 @@
 import Swal from "sweetalert2";
+import { formatAppDate, formatDateInputValue } from "../../../../utils/dateFormat";
 
 // Format date for export (YYYY-MM-DD)
 export const formatDateForExport = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    if (Number.isNaN(date.getTime())) return "N/A";
-    return date.toISOString().split("T")[0];
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(dateString, "yyyy-MM-dd");
 };
 
 const escapeCsvCell = (cell) => {
@@ -120,7 +114,7 @@ export const exportToCSV = async (banks, setIsExporting) => {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
 
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filename = `blood-banks-export-${date}.csv`;
 
     link.setAttribute("href", url);
@@ -252,7 +246,7 @@ export const exportToJSON = async (banks, setIsExporting) => {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
 
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filename = `blood-banks-export-${date}.json`;
 
     link.setAttribute("href", url);

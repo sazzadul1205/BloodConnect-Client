@@ -53,21 +53,11 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import ErrorState from "../../../../shared/ErrorState";
 import BloodLoader from "../../../../shared/BloodLoader";
+import { formatAppDate } from "../../../../utils/dateFormat";
 
 // Format date for display
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "Invalid Date";
-  }
+  return formatAppDate(value);
 };
 
 // Bank type configuration

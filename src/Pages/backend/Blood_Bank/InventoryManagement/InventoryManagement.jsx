@@ -39,38 +39,20 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import ErrorState from "../../../../shared/ErrorState";
 import BloodLoader from "../../../../shared/BloodLoader";
+import {
+  formatAppDateTime,
+  formatAppTime,
+  formatDateInputValue,
+} from "../../../../utils/dateFormat";
 
 // Format date for display
 const formatDateTime = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "Invalid Date";
-  }
+  return formatAppDateTime(value);
 };
 
 // Format time only
 const formatTimeOnly = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "Invalid Date";
-  }
+  return formatAppTime(value);
 };
 
 // Blood types
@@ -491,7 +473,7 @@ const InventoryManagement = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `inventory-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `inventory-export-${formatDateInputValue(new Date())}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };

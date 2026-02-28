@@ -39,6 +39,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import { formatAppDate, formatAppDateTime } from "../../../../utils/dateFormat";
 
 // Helper function to extract ID from MongoDB ObjectId
 const getId = (value) => {
@@ -51,38 +52,12 @@ const getId = (value) => {
 
 // Format date for display
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
-    return "Invalid Date";
-  }
+  return formatAppDate(value, "MMM d, yyyy", "Invalid Date");
 };
 
 // Format date with time
 const formatDateTime = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    // eslint-disable-next-line no-unused-vars
-  } catch (e) {
-    return "Invalid Date";
-  }
+  return formatAppDateTime(value, "MMM d, yyyy p", "Invalid Date");
 };
 
 // Status colors mapping

@@ -36,6 +36,7 @@ import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
 import DonationDetailsModal from "./DonationDetailsModal/DonationDetailsModal";
 import DonorProfileRequired from "../../../../shared/DonorProfileRequired";
+import { formatAppDate, formatAppDateTime } from "../../../../utils/dateFormat";
 
 // Constants
 const donationTypes = [
@@ -223,26 +224,12 @@ const DonationHistory = () => {
 
   // Format date for display
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString.$date || dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatAppDateTime(dateString);
   };
 
   // Format date only
   const formatDateOnly = (dateString) => {
-    if (!dateString) return "N/A";
-    const date = new Date(dateString.$date || dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return formatAppDate(dateString);
   };
 
   // Get donation type details

@@ -1,39 +1,21 @@
 // Pages/backend/Admin/AuditLogs/AuditLogsExport.js
 
 import Swal from "sweetalert2";
+import {
+  formatAppDate,
+  formatAppDateTime,
+  formatAppTime,
+  formatDateInputValue,
+} from "../../../../utils/dateFormat";
 
 // Format date for export (YYYY-MM-DD)
 export const formatDateForExport = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "N/A";
-    return date.toISOString().split("T")[0];
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(dateString, "yyyy-MM-dd");
 };
 
 // Format timestamp with time
 export const formatTimestampForExport = (timestamp) => {
-  if (!timestamp) return "N/A";
-  try {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return "N/A";
-    return date
-      .toLocaleString("en-US", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      })
-      .replace(",", "");
-  } catch {
-    return "N/A";
-  }
+  return formatAppDateTime(timestamp, "yyyy-MM-dd HH:mm:ss");
 };
 
 // Export audit logs to CSV
@@ -94,7 +76,7 @@ export const exportToCSV = async (logs, filters = {}, setIsExporting) => {
       const timestamp = log.timestamp ? new Date(log.timestamp) : null;
       const dateStr = timestamp ? formatDateForExport(timestamp) : "N/A";
       const timeStr = timestamp
-        ? timestamp.toLocaleTimeString("en-US", { hour12: false })
+        ? formatAppTime(timestamp, "HH:mm:ss")
         : "N/A";
 
       // Format changes summary
@@ -173,7 +155,7 @@ export const exportToCSV = async (logs, filters = {}, setIsExporting) => {
     const url = URL.createObjectURL(blob);
 
     // Generate filename with current date and filter info
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filterInfo = filters.action ? `-${filters.action.toLowerCase()}` : "";
     const filename = `audit-logs${filterInfo}-${date}.csv`;
 
@@ -305,7 +287,7 @@ export const exportToJSON = async (logs, filters = {}, setIsExporting) => {
     const url = URL.createObjectURL(blob);
 
     // Generate filename
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filterInfo = filters.action ? `-${filters.action.toLowerCase()}` : "";
     const filename = `audit-logs${filterInfo}-${date}.json`;
 

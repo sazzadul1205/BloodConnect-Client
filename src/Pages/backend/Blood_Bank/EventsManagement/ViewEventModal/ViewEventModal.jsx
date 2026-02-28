@@ -40,39 +40,16 @@ import {
 // Hooks
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../../shared/BloodLoader";
+import { formatAppDate, formatAppDateTime } from "../../../../../utils/dateFormat";
 
 // Format date
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(value);
 };
 
 // Format datetime
 const formatDateTime = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppDateTime(value);
 };
 
 // Event type config

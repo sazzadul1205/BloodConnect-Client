@@ -34,6 +34,7 @@ import { FaDroplet } from "react-icons/fa6";
 import BloodLoader from "../../../../../shared/BloodLoader";
 import ErrorState from "../../../../../shared/ErrorState";
 import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
+import { formatAppDate, formatAppDateTime } from "../../../../../utils/dateFormat";
 
 const ViewBloodBankModal = ({ bankId, onClose }) => {
   const { axiosInstance } = useAxiosPublic();
@@ -66,34 +67,12 @@ const ViewBloodBankModal = ({ bankId, onClose }) => {
 
   // Format date
   const formatDate = (dateString) => {
-    if (!dateString) return "N/A";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    } catch {
-      return "N/A";
-    }
+    return formatAppDate(dateString, "MMMM d, yyyy");
   };
 
   // Format datetime
   const formatDateTime = (dateString) => {
-    if (!dateString) return "N/A";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "N/A";
-    }
+    return formatAppDateTime(dateString, "MMMM d, yyyy p");
   };
 
   // Get bank type icon and color

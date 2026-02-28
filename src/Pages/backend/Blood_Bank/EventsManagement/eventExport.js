@@ -1,17 +1,11 @@
 // Pages/backend/BloodBank/EventsManagement/eventExport.js
 
 import Swal from "sweetalert2";
+import { formatAppDate, formatDateInputValue } from "../../../../utils/dateFormat";
 
 // Format date for export
 export const formatDateForExport = (dateString) => {
-  if (!dateString) return "N/A";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "N/A";
-    return date.toISOString().split("T")[0];
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(dateString, "yyyy-MM-dd");
 };
 
 // Escape CSV cell
@@ -130,7 +124,7 @@ export const exportToCSV = async (events, activeTab, setIsExporting) => {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
 
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filterInfo = activeTab !== "all" ? `-${activeTab}` : "";
     const filename = `events-export${filterInfo}-${date}.csv`;
 
@@ -264,7 +258,7 @@ export const exportToJSON = async (events, activeTab, setIsExporting) => {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
 
-    const date = new Date().toISOString().split("T")[0];
+    const date = formatDateInputValue(new Date());
     const filterInfo = activeTab !== "all" ? `-${activeTab}` : "";
     const filename = `events-export${filterInfo}-${date}.json`;
 

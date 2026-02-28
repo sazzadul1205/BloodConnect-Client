@@ -40,6 +40,7 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import BloodLoader from "../../../../shared/BloodLoader";
 import ErrorState from "../../../../shared/ErrorState";
+import { formatAppDate, formatAppTime, formatDateInputValue } from "../../../../utils/dateFormat";
 
 // Modals
 import StaffDetailsModal from "./StaffDetailsModal/StaffDetailsModal";
@@ -58,33 +59,12 @@ const getId = (value) => {
 
 // Format date for display
 const formatDate = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppDate(value);
 };
 
 // Format time
 const formatTime = (value) => {
-  if (!value) return "N/A";
-  try {
-    const date = new Date(value?.$date || value);
-    if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return "N/A";
-  }
+  return formatAppTime(value);
 };
 
 // Staff role configuration
@@ -159,8 +139,7 @@ const StaffDashboard = () => {
 
   // Get today's date for filtering
   const today = useMemo(() => {
-    const date = new Date();
-    return date.toISOString().split('T')[0];
+    return formatDateInputValue(new Date());
   }, []);
 
   // States
@@ -932,7 +911,7 @@ const StaffDashboard = () => {
       {/* Footer Note */}
       <div className="text-xs text-center text-base-content/60 flex items-center justify-center gap-2">
         <FaShieldAlt className="inline" />
-        Staff dashboard updates in real-time. Last updated: {new Date().toLocaleTimeString()}
+        Staff dashboard updates in real-time. Last updated: {formatAppTime(new Date())}
       </div>
 
       {/* Modals */}
