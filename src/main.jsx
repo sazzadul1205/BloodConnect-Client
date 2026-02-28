@@ -53,6 +53,8 @@ import HospitalSettings from './Pages/backend/Hospital/HospitalSettings/Hospital
 import HospitalDashboard from './Pages/backend/Hospital/HospitalDashboard/HospitalDashboard.jsx';
 import BankProfile from './Pages/backend/Blood_Bank/BankProfile/BankProfile.jsx';
 import InventoryManagement from './Pages/backend/Blood_Bank/InventoryManagement/InventoryManagement.jsx';
+import EventsManagement from './Pages/backend/Blood_Bank/EventsManagement/EventsManagement.jsx';
+import StaffDashboard from './Pages/backend/Blood_Bank/StaffDashboard/StaffDashboard.jsx';
 
 
 // Create Query Client
@@ -128,6 +130,8 @@ createRoot(document.getElementById('root')).render(
                 <Route path="/blood_bank/dashboard" element={<h1 className='text-black'>Blood Bank Dashboard</h1>} />
                 <Route path="/blood_bank/bank-profile" element={<BankProfile />} />
                 <Route path="/blood_bank/inventory-management" element={<InventoryManagement />} />
+                <Route path="/blood_bank/events-management" element={<EventsManagement />} />
+                <Route path="/blood_bank/staff-dashboard" element={<StaffDashboard />} />
               </Route>
             </Route>
 
