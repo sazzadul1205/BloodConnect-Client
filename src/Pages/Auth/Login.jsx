@@ -11,7 +11,9 @@ import { motion } from "framer-motion";
 // Icons
 import {
   FaTint, FaEnvelope, FaLock, FaEye, FaEyeSlash,
-  FaArrowLeft, FaHeartbeat, FaShieldAlt, FaPhone
+  FaArrowLeft, FaHeartbeat, FaShieldAlt, FaPhone,
+  FaUserMd, FaHospital, FaUserTie, FaFlask, FaRocket,
+  FaUsers, FaCopy
 } from "react-icons/fa";
 
 // Hooks
@@ -26,6 +28,7 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loginMethod, setLoginMethod] = useState("email");
 
+
   // Hooks Call
   const { login, loading, error } = useAuth();
   const navigate = useNavigate();
@@ -34,6 +37,7 @@ const Login = () => {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -43,14 +47,76 @@ const Login = () => {
     },
   });
 
+  // Demo accounts for quick login
+  const demoAccounts = [
+    {
+      role: "Donor",
+      email: "donor@gmail.com",
+      password: "Donor1205",
+      icon: <FaHeartbeat />,
+      color: "bg-error",
+      description: "View donation history & find events"
+    },
+    {
+      role: "Requester",
+      email: "Requester@gmail.com",
+      password: "Requester1205",
+      icon: <FaUserMd />,
+      color: "bg-warning",
+      description: "Request blood for patients"
+    },
+    {
+      role: "Hospital Staff",
+      email: "HospitalStaff@gmail.com",
+      password: "Demo1234",
+      icon: <FaHospital />,
+      color: "bg-info",
+      description: "Manage blood requests & inventory"
+    },
+    {
+      role: "Blood Bank",
+      email: "BloodBank@gmail.com",
+      password: "Demo1234",
+      icon: <FaFlask />,
+      color: "bg-secondary",
+      description: "Track donations & manage stock"
+    },
+    {
+      role: "Admin",
+      email: "admin@gmail.com",
+      password: "Admin1205",
+      icon: <FaUserTie />,
+      color: "bg-purple-600",
+      description: "Full system access & analytics"
+    }
+  ];
+
   // Redirect based on role
   const roleRoutes = {
     donor: "/donor/dashboard",
     hospital: "/hospital/dashboard",
     requester: "/requester/dashboard",
-    blood_bank: "/blood_bank/dashboard",
+    blood_bank: "/blood_bank/bank-profile",
     admin: "/admin/dashboard",
     super_admin: "/super_admin/dashboard",
+  };
+
+  // Quick paste function - just fills the form without logging in
+  const fillCredentials = (email, password) => {
+    setValue("email", email);
+    setValue("password", password);
+    setLoginMethod("email");
+
+    // Optional: Show a small notification
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-top toast-center';
+    toast.innerHTML = `
+      <div class="alert alert-success">
+        <span>Credentials pasted! Click Sign In to continue.</span>
+      </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
   };
 
   // Submit handler
@@ -72,7 +138,6 @@ const Login = () => {
     }
   };
 
-
   const fadeIn = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
@@ -90,7 +155,7 @@ const Login = () => {
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           whileHover={{ scale: 1.05, x: -5 }}
-          className="absolute top-6 left-6 btn btn-ghost btn-sm gap-2 bg-base-100/50 backdrop-blur-sm hover:bg-error hover:text-white transition-all duration-300"
+          className="absolute top-6 left-6 btn btn-ghost btn-sm gap-2 bg-base-100/50 backdrop-blur-sm hover:bg-error hover:text-white transition-all duration-300 z-10"
         >
           <FaArrowLeft /> Back to Home
         </motion.button>
@@ -101,18 +166,76 @@ const Login = () => {
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         whileHover={{ scale: 1.05, x: -5 }}
-        className="absolute top-6 right-6 "
+        className="absolute top-6 right-6 z-10"
       >
         <ThemeToggle />
       </motion.div>
 
+      {/* Quick Login Panel - Bottom Left */}
+      <motion.div
+        initial={{ opacity: 0, x: -50 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
+        className="absolute bottom-6 left-6 z-20 max-w-sm"
+      >
+        <div className="bg-base-100/95 backdrop-blur-md rounded-2xl shadow-2xl border border-error/20 p-4">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 bg-error/10 rounded-full flex items-center justify-center">
+              <FaRocket className="text-error text-sm" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-sm flex items-center gap-1">
+                Demo Quick Access
+                <span className="badge badge-error badge-xs">DEMO</span>
+              </h3>
+              <p className="text-[10px] opacity-60">Click to copy or paste credentials</p>
+            </div>
+          </div>
 
-      {/* Main Card */}
+          {/* Demo Accounts List */}
+          <div className="space-y-2">
+            {demoAccounts.map((account) => (
+              <div
+                key={account.role}
+                onClick={() => fillCredentials(account.email, account.password)}
+                className={`${account.color} bg-opacity-10 hover:bg-opacity-30 rounded-lg p-3 border border-${account.color.split('-')[1]}/30 cursor-pointer transition-all`}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Icon */}
+                  <div className={`w-8 h-8 ${account.color} rounded-full flex items-center justify-center text-white text-sm`}>
+                    {account.icon}
+                  </div>
+
+                  {/* Role Name */}
+                  <div className="flex-1">
+                    <span className="font-semibold text-sm">{account.role}</span>
+                    <p className="text-[10px] opacity-60 line-clamp-1">{account.description}</p>
+                  </div>
+
+                  {/* Click indicator */}
+                  <div className="text-xs bg-base-300 text-base-content px-2 py-1 rounded-full text-[8px] opacity-50">
+                    click
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Info Footer */}
+          <div className="mt-3 text-[10px] opacity-50 flex items-center gap-1 justify-center">
+            <FaUsers />
+            <span>5 demo accounts • Click Paste to fill form</span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Main Card - Centered */}
       <motion.div
         initial="hidden"
         animate="visible"
         variants={fadeIn}
-        className="w-full max-w-md"
+        className="w-full max-w-md z-10"
       >
         <div className="card bg-base-100/90 backdrop-blur-md shadow-2xl border border-error/20">
 
@@ -137,6 +260,17 @@ const Login = () => {
               <p className="text-sm opacity-70 mt-1">
                 Donate blood, save lives. Sign in to continue.
               </p>
+            </div>
+
+            {/* Demo Project Banner */}
+            <div className="alert alert-info shadow-lg mb-4 bg-blue-100 border-blue-300">
+              <div className="flex items-center gap-5" >
+                <FaRocket className="text-blue-600 text-xl" />
+                <div>
+                  <h3 className="font-bold text-blue-800 text-sm">Demo Project</h3>
+                  <p className="text-xs text-blue-700">Use the panel at bottom left to paste credentials</p>
+                </div>
+              </div>
             </div>
 
             {/* Login Method Toggle */}
