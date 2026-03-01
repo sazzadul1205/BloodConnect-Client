@@ -18,13 +18,17 @@ import {
   FiClipboard,
   FiUser,
   FiActivity,
-  FiSliders,
+
   FiClock,
   FiDroplet,
   FiMapPin,
   FiPlusCircle,
   FiList,
   FiBarChart2,
+  FiMenu,
+
+  FiX,
+  FiMail,
 } from "react-icons/fi";
 import { FaHeartbeat } from "react-icons/fa";
 
@@ -33,7 +37,7 @@ import useAuth from "../../../hooks/useAuth";
 
 // ThemeToggle
 import ThemeToggle from "../../Frontend/layout/ThemeToggle";
-import MessagesDropdown from "./components/MessagesDropdown";
+import MessagesDrawer from "./components/MessagesDrawer";
 
 
 // Navigation configurations for different user types
@@ -103,6 +107,20 @@ const Backend_Layout = ({ userType }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [messagesDrawerOpen, setMessagesDrawerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState("home");
+
+  // Check if mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Get navigation items based on user type
   const navigation = navigationConfig[userType] || navigationConfig.donor;
@@ -146,7 +164,6 @@ const Backend_Layout = ({ userType }) => {
     }
   };
 
-
   // Detect fullscreen changes
   useEffect(() => {
     const handleChange = () => setIsFullscreen(!!document.fullscreenElement);
@@ -156,79 +173,112 @@ const Backend_Layout = ({ userType }) => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-base-200">
-      {/* ================= Desktop Sidebar (Fixed) ================= */}
-      <aside
-        className={`hidden lg:flex flex-col bg-base-100 border-r border-base-300 h-screen fixed left-0 top-0
-          ${isCollapsed ? "w-20" : "w-72"} transition-all duration-300 shadow-lg z-30`}
-      >
-        {/* Logo + Collapse */}
-        <div className="h-16 px-4 border-b border-red-500 flex items-center gap-3 shrink-0">
-          <div className="bg-error/10 p-2 rounded-xl">
-            <FaHeartbeat className="text-error text-xl" />
+      {/* ================= Desktop Sidebar (lg and above) ================= */}
+      {!isMobile && (
+        <aside
+          className={`hidden lg:flex flex-col bg-base-100 border-r border-base-300 h-screen fixed left-0 top-0
+            ${isCollapsed ? "w-20" : "w-72"} transition-all duration-300 shadow-lg z-30`}
+        >
+          {/* Logo + Collapse */}
+          <div className="h-16 px-4 border-b border-red-500 flex items-center gap-3 shrink-0">
+            <div className="bg-error/10 p-2 rounded-xl">
+              <FaHeartbeat className="text-error text-xl" />
+            </div>
+            {!isCollapsed && <h1 className="text-xl font-bold tracking-wide">BloodConnect</h1>}
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="ml-auto btn btn-ghost btn-sm"
+            >
+              {isCollapsed ? <FiChevronRight /> : <FiChevronLeft />}
+            </button>
           </div>
-          {!isCollapsed && <h1 className="text-xl font-bold tracking-wide">BloodConnect</h1>}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="ml-auto btn btn-ghost btn-sm"
-          >
-            {isCollapsed ? <FiChevronRight /> : <FiChevronLeft />}
-          </button>
-        </div>
 
-        {/* Sidebar Links - Scrollable */}
-        <div className={`flex-1 ${isCollapsed ? "overflow-visible" : "overflow-y-auto"}`}>
-          <ul className="p-3 space-y-1">
-            {resolvedNavigation.map((item) => (
-              <li key={item.name} className={isCollapsed ? "overflow-visible" : ""}>
-                <NavLink
-                  to={item.path}
-                  title={isCollapsed ? item.name : ""}
-                  data-tip={isCollapsed ? item.name : ""}
-                  className={({ isActive }) =>
-                    `flex items-center ${isCollapsed ? "justify-center tooltip tooltip-right z-80 [&:before]:z-90 [&:after]:z-90" : "gap-3"} px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
-                    }`
-                  }
-                >
-                  <item.icon size={18} />
-                  {!isCollapsed && <span className="font-medium">{item.name}</span>}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </div>
+          {/* Sidebar Links - Scrollable */}
+          <div className={`flex-1 ${isCollapsed ? "overflow-visible" : "overflow-y-auto"}`}>
+            <ul className="p-3 space-y-1">
+              {resolvedNavigation.map((item) => (
+                <li key={item.name} className={isCollapsed ? "overflow-visible" : ""}>
+                  <NavLink
+                    to={item.path}
+                    title={isCollapsed ? item.name : ""}
+                    data-tip={isCollapsed ? item.name : ""}
+                    className={({ isActive }) =>
+                      `flex items-center ${isCollapsed ? "justify-center tooltip tooltip-right z-80 [&:before]:z-90 [&:after]:z-90" : "gap-3"} px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
+                      }`
+                    }
+                  >
+                    <item.icon size={18} />
+                    {!isCollapsed && <span className="font-medium">{item.name}</span>}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        {/* Logout - Fixed at bottom */}
-        <div className="p-3 border-t border-red-500 shrink-0">
-          <button
-            onClick={logout}
-            title={isCollapsed ? "Logout" : ""}
-            data-tip={isCollapsed ? "Logout" : ""}
-            className={`flex items-center w-full ${isCollapsed ? "justify-center tooltip tooltip-right z-80 [&:before]:z-90 [&:after]:z-90" : "gap-3"} px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200`}
-          >
-            <FiLogOut size={18} />
-            {!isCollapsed && <span className="font-medium">Logout</span>}
-          </button>
-        </div>
-      </aside>
+          {/* Logout - Fixed at bottom */}
+          <div className="p-3 border-t border-red-500 shrink-0">
+            <button
+              onClick={logout}
+              title={isCollapsed ? "Logout" : ""}
+              data-tip={isCollapsed ? "Logout" : ""}
+              className={`flex items-center w-full ${isCollapsed ? "justify-center tooltip tooltip-right z-80 [&:before]:z-90 [&:after]:z-90" : "gap-3"} px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200`}
+            >
+              <FiLogOut size={18} />
+              {!isCollapsed && <span className="font-medium">Logout</span>}
+            </button>
+          </div>
+        </aside>
+      )}
 
-      {/* ================= Mobile Sidebar Overlay ================= */}
-      {mobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 lg:hidden" onClick={() => setMobileMenuOpen(false)}>
+      {/* ================= Mobile Sidebar Drawer ================= */}
+      {isMobile && (
+        <>
+          {/* Drawer Overlay for Menu */}
+          {mobileMenuOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+          )}
+
+          {/* Menu Drawer Content */}
           <aside
-            className="fixed inset-y-0 left-0 w-72 bg-base-100 p-4 flex flex-col shadow-lg"
-            onClick={(e) => e.stopPropagation()}
+            className={`fixed inset-y-0 left-0 w-72 bg-base-100 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+              }`}
           >
-            <div className="flex justify-between items-center mb-6 shrink-0">
+            {/* Drawer Header */}
+            <div className="h-16 px-4 border-b border-red-500 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
-                <FaHeartbeat className="text-error text-xl" />
-                <h1 className="text-xl font-bold">BloodConnect</h1>
+                <div className="bg-error/10 p-2 rounded-xl">
+                  <FaHeartbeat className="text-error text-xl" />
+                </div>
+                <h1 className="text-xl font-bold tracking-wide">BloodConnect</h1>
               </div>
-              <button onClick={() => setMobileMenuOpen(false)} className="btn btn-ghost btn-sm">
-                <FiChevronLeft />
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="btn btn-ghost btn-circle btn-sm"
+              >
+                <FiX size={20} />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            {/* User Info in Drawer */}
+            <div className="p-4 border-b border-base-300">
+              <div className="flex items-center gap-3">
+                <div className="avatar">
+                  <div className="w-12 rounded-full bg-error text-white flex items-center justify-center font-semibold text-lg shadow">
+                    {user?.profile?.fullName?.charAt(0) || "U"}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{user?.profile?.fullName || "User"}</p>
+                  <p className="text-xs opacity-70">{formatUserType(userType)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Navigation Links */}
+            <div className="flex-1 overflow-y-auto p-4">
               <ul className="space-y-1">
                 {resolvedNavigation.map((item) => (
                   <li key={item.name}>
@@ -236,7 +286,9 @@ const Backend_Layout = ({ userType }) => {
                       to={item.path}
                       onClick={() => setMobileMenuOpen(false)}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive ? "bg-error text-white shadow-md" : "hover:bg-base-200 text-base-content"
+                        `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
+                          ? "bg-error text-white shadow-md"
+                          : "hover:bg-base-200 text-base-content"
                         }`
                       }
                     >
@@ -246,9 +298,18 @@ const Backend_Layout = ({ userType }) => {
                   </li>
                 ))}
               </ul>
+
+              {/* Theme Toggle in Menu Drawer */}
+              <div className="mt-6 pt-4 border-t border-base-300">
+                <div className="flex items-center justify-between px-4 py-2">
+                  <span className="font-medium">Theme</span>
+                  <ThemeToggle />
+                </div>
+              </div>
             </div>
 
-            <div className="shrink-0 mt-4">
+            {/* Drawer Footer with Logout */}
+            <div className="p-4 border-t border-red-500">
               <button
                 onClick={logout}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200"
@@ -258,82 +319,110 @@ const Backend_Layout = ({ userType }) => {
               </button>
             </div>
           </aside>
-        </div>
+
+          {/* Messages Drawer */}
+          <MessagesDrawer
+            isOpen={messagesDrawerOpen}
+            onClose={() => setMessagesDrawerOpen(false)}
+            user={user}
+          />
+        </>
       )}
 
-      {/* ================= Main Content Area (Scrollable) ================= */}
+      {/* ================= Main Content Area ================= */}
       <div
         className="flex-1 flex flex-col h-screen overflow-y-auto"
         style={{
-          marginLeft: isCollapsed ? '5rem' : '18rem', // 5rem = w-20 (80px), 18rem = w-72 (288px)
+          marginLeft: !isMobile && isCollapsed ? '5rem' : !isMobile ? '18rem' : '0',
           transition: 'margin-left 300ms'
         }}
       >
-        {/* Top Navbar - Fixed at top of content area */}
-        <div className="navbar bg-base-100 border-b border-base-300 px-2 h-16 flex justify-between lg:justify-end sticky top-0 z-20">
-          {/* Mobile Hamburger Button */}
-          <div className="flex items-center gap-2 lg:hidden">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="btn btn-ghost btn-circle"
-            >
-              <FiChevronRight size={24} />
-            </button>
+        {/* ================= Desktop Navbar (hidden on mobile) ================= */}
+        {!isMobile && (
+          <div className="navbar bg-base-100 border-b border-base-300 px-2 h-16 flex justify-between lg:justify-end sticky top-0 z-20">
+            <div className="flex-1 pl-3">
+              <h2 className="text-lg font-semibold tracking-wide">
+                Welcome back,{' '}
+                <span className="text-error">
+                  {formatUserType(userType)}: {user?.profile?.fullName || "User"}
+                </span>
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <button onClick={toggleFullscreen} className="btn btn-ghost btn-circle hover:bg-base-200">
+                {isFullscreen ? <FiMinimize size={18} /> : <FiMaximize size={18} />}
+              </button>
+
+              {/* Use MessagesDropdown for desktop */}
+              <MessagesDrawer user={user} isDesktop={true} />
+
+              <div className="avatar">
+                <div className="w-9 rounded-full bg-error text-white flex items-center justify-center font-semibold shadow">
+                  {user?.profile?.fullName?.charAt(0) || "U"}
+                </div>
+              </div>
+
+              <ThemeToggle />
+            </div>
           </div>
+        )}
 
-          {/* Desktop Greeting */}
-          <div className="flex-1 pl-3 hidden lg:block">
-            <h2 className="text-lg font-semibold tracking-wide">
-              Welcome back,{' '}
-              <span className="text-error">
-                {formatUserType(userType)}: {user?.profile?.fullName || "User"}
-              </span>
-            </h2>
+        {/* Page Content - Scrolls with main container */}
+        <div className={`flex-1 ${isMobile ? 'pb-24' : ''}`}>
+          <div className="p-4 sm:p-6">
+            <div className="bg-base-100 rounded-2xl shadow-sm border border-base-300 p-4 sm:p-6">
+              <Outlet />
+            </div>
           </div>
+        </div>
+      </div>
 
-          {/* Top Navbar Actions */}
-          <div className="flex items-center gap-4">
-            <button onClick={toggleFullscreen} className="btn btn-ghost btn-circle hover:bg-base-200">
-              {isFullscreen ? <FiMinimize size={18} /> : <FiMaximize size={18} />}
-            </button>
+      {/* ================= Mobile Dock (DaisyUI Dock) ================= */}
+      {isMobile && (
+        <div className="dock dock-lg z-30">
+          {/* Left - Messages */}
+          <button
+            className={activeMobileTab === 'messages' ? 'dock-active' : ''}
+            onClick={() => {
+              setActiveMobileTab('messages');
+              setMessagesDrawerOpen(true);
+            }}
+          >
+            <div className="relative">
+              <FiMail className="size-[1.2em]" />
+              <span className="badge badge-xs badge-error absolute -top-1 -right-1">3</span>
+            </div>
+            <span className="dock-label">Messages</span>
+          </button>
 
-            <MessagesDropdown user={user} />
-
+          {/* Center - Profile */}
+          <NavLink
+            to={`/${userType}/profile`}
+            className={({ isActive }) => isActive ? 'dock-active' : ''}
+            onClick={() => setActiveMobileTab('profile')}
+          >
             <div className="avatar">
-              <div className="w-9 rounded-full bg-error text-white flex items-center justify-center font-semibold shadow">
+              <div className="w-6 rounded-full bg-error text-white flex items-center justify-center font-semibold text-xs">
                 {user?.profile?.fullName?.charAt(0) || "U"}
               </div>
             </div>
-
-            <ThemeToggle />
-          </div>
-        </div>
-
-        {/* Page Content - Scrolls with main container */}
-        <div className="p-4 sm:p-6 flex-1">
-          <div className="bg-base-100 rounded-2xl shadow-sm border border-base-300 p-6">
-            <Outlet />
-          </div>
-        </div>
-      </div>
-
-      {/* ================= Mobile Bottom Dock ================= */}
-      <div className="lg:hidden fixed bottom-0 w-full bg-base-100 border-t border-base-300 flex justify-around py-2 shadow-lg z-40">
-        {/* Show first 5 navigation items in dock */}
-        {resolvedNavigation.slice(0, 5).map((item, idx) => (
-          <NavLink
-            key={idx}
-            to={item.path}
-            className={({ isActive }) =>
-              `flex flex-col items-center justify-center text-xs transition-all duration-200 ${isActive ? "text-error" : "text-base-content"
-              }`
-            }
-          >
-            <item.icon size={22} />
-            <span className="text-[0.65rem]">{item.name}</span>
+            <span className="dock-label">Profile</span>
           </NavLink>
-        ))}
-      </div>
+
+          {/* Right - Menu */}
+          <button
+            className={activeMobileTab === 'menu' ? 'dock-active' : ''}
+            onClick={() => {
+              setActiveMobileTab('menu');
+              setMobileMenuOpen(true);
+            }}
+          >
+            <FiMenu className="size-[1.2em]" />
+            <span className="dock-label">Menu</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
