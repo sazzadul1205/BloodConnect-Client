@@ -3,9 +3,6 @@
 // React
 import React, { useMemo } from "react";
 
-// eslint-disable-next-line no-unused-vars
-import { motion } from "framer-motion";
-
 // Icons - Fi (Feather Icons)
 import {
   FiCalendar,
@@ -54,7 +51,8 @@ const formatDateTime = (value) => {
       minute: "2-digit",
     });
   } catch (error) {
-    console.error("Date formatting error:", error);
+    console.log(error);
+
     return "Invalid Date";
   }
 };
@@ -86,7 +84,7 @@ const EventDetailsModal = ({
       id: getId(selectedEvent._id),
       registered: isRegistered ? isRegistered(selectedEvent) : false,
       isLoading: actionLoadingId === getId(selectedEvent._id),
-      isFull: selectedEvent?.spotsLeft === 0,
+      isFull: selectedEvent?.spotsLeft === 0 || selectedEvent?.registrationStatus === 'full',
       type: selectedEvent?.type || 'regular',
       typeConfig: eventTypeConfig[selectedEvent?.type] || eventTypeConfig.regular,
       requirements: selectedEvent?.requirements || {},
@@ -96,6 +94,7 @@ const EventDetailsModal = ({
       schedule: selectedEvent?.schedule || {},
       registeredDonors: Array.isArray(selectedEvent?.registeredDonors) ? selectedEvent.registeredDonors : [],
       stats: selectedEvent?.stats || {},
+      status: selectedEvent?.status?.current || 'upcoming',
     };
   }, [selectedEvent, isRegistered, actionLoadingId]);
 
@@ -119,7 +118,7 @@ const EventDetailsModal = ({
           <FiAlertCircle className="text-5xl text-error mb-4" />
           <h3 className="text-lg font-semibold mb-2">Failed to Load Event</h3>
           <p className="text-base-content/70 mb-4">
-            {error?.message || "Could not load event details. Please try again."}
+            {error?.message || "Could not load event details."}
           </p>
           <button
             type="button"
@@ -148,21 +147,28 @@ const EventDetailsModal = ({
       {/* Modal Header */}
       <div className="bg-linear-to-r from-error to-error/80 p-4 sm:p-6 text-white">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="bg-white/20 p-2 sm:p-3 rounded-full shrink-0">
               <FiCalendar size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div className="min-w-0">
               <h2 className="font-bold text-lg sm:text-2xl truncate">{selectedEvent.title}</h2>
-              <p className="text-white/80 text-xs sm:text-sm">
-                {eventData.typeConfig.label}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`badge badge-sm badge-${eventData.typeConfig.color}`}>
+                  {eventData.typeConfig.label}
+                </span>
+                <span className={`badge badge-sm badge-${statusColors[eventData.status]}`}>
+                  {eventData.status}
+                </span>
+                {eventData.isFull && (
+                  <span className="badge badge-sm badge-error">Full</span>
+                )}
+              </div>
             </div>
           </div>
           <button
             onClick={onClose}
             className="btn btn-ghost btn-xs sm:btn-sm btn-circle text-white hover:bg-white/20 self-end sm:self-start"
-            aria-label="Close modal"
           >
             ✕
           </button>
@@ -176,7 +182,7 @@ const EventDetailsModal = ({
           {selectedEvent.description || "No description provided."}
         </p>
 
-        {/* Event Stats (if available) */}
+        {/* Event Stats */}
         {eventData.stats && Object.keys(eventData.stats).length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
             <div className="bg-base-200 rounded-lg p-2 text-center">
@@ -215,12 +221,6 @@ const EventDetailsModal = ({
                 <p className="opacity-70">End</p>
                 <p className="font-medium wrap-break-word">{formatDateTime(eventData.schedule.endDate)}</p>
               </div>
-              {eventData.schedule.startTime && eventData.schedule.endTime && (
-                <div>
-                  <p className="opacity-70">Hours</p>
-                  <p className="font-medium">{eventData.schedule.startTime} - {eventData.schedule.endTime}</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -241,12 +241,6 @@ const EventDetailsModal = ({
                   {eventData.location.address || eventData.location.city || "N/A"}
                 </p>
               </div>
-              {eventData.location.city && (
-                <div>
-                  <p className="opacity-70">City</p>
-                  <p className="font-medium">{eventData.location.city}</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -262,7 +256,7 @@ const EventDetailsModal = ({
                 <p className="font-medium">{eventData.capacity.currentRegistrations || 0}</p>
               </div>
               <div>
-                <p className="opacity-70">Maximum Donors</p>
+                <p className="opacity-70">Maximum</p>
                 <p className="font-medium">{eventData.capacity.maxDonors || 0}</p>
               </div>
               <div>
@@ -271,12 +265,6 @@ const EventDetailsModal = ({
                   {selectedEvent?.spotsLeft || 0}
                 </p>
               </div>
-              {eventData.capacity.walkIns !== undefined && (
-                <div>
-                  <p className="opacity-70">Walk-ins</p>
-                  <p className="font-medium">{eventData.capacity.walkIns ? "Allowed" : "Not Allowed"}</p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -288,7 +276,7 @@ const EventDetailsModal = ({
             </h3>
             <div className="space-y-2 text-xs sm:text-sm">
               <div>
-                <p className="opacity-70">Accepted Blood Types</p>
+                <p className="opacity-70">Blood Types</p>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {eventData.requirements.bloodTypes?.length > 0 ? (
                     eventData.requirements.bloodTypes.map((type) => (
@@ -309,7 +297,7 @@ const EventDetailsModal = ({
               )}
               {eventData.requirements.minWeight && (
                 <div>
-                  <p className="opacity-70">Minimum Weight</p>
+                  <p className="opacity-70">Min Weight</p>
                   <p className="font-medium">{eventData.requirements.minWeight} kg</p>
                 </div>
               )}
@@ -358,9 +346,6 @@ const EventDetailsModal = ({
                     <span className="truncate max-w-20 sm:max-w-none">
                       {reg.donorName || `Donor ${idx + 1}`}
                     </span>
-                    {reg.donorBloodGroup && (
-                      <span className="badge badge-xs ml-1">{reg.donorBloodGroup}</span>
-                    )}
                   </div>
                 ))}
                 {eventData.registeredDonors.length > 5 && (
@@ -381,7 +366,7 @@ const EventDetailsModal = ({
           </div>
         )}
 
-        {eventData.isFull && (
+        {eventData.isFull && !eventData.registered && (
           <div className="mt-4 alert alert-error bg-error/10 border-error/20 p-3 sm:p-4">
             <FiAlertCircle className="text-error text-sm sm:text-base shrink-0" />
             <span className="text-xs sm:text-sm">This event is full. No more registrations accepted.</span>
@@ -414,7 +399,7 @@ const EventDetailsModal = ({
               ) : (
                 <FiXCircle size={14} />
               )}
-              <span className="truncate">{eventData.isLoading ? "Cancelling..." : "Cancel Registration"}</span>
+              <span>Cancel Registration</span>
             </button>
           ) : (
             <button
@@ -431,15 +416,22 @@ const EventDetailsModal = ({
               ) : (
                 <FiCheckCircle size={14} />
               )}
-              <span className="truncate">
-                {eventData.isLoading ? "Registering..." : eventData.isFull ? "Event Full" : "Register Now"}
-              </span>
+              <span>{eventData.isFull ? "Event Full" : "Register Now"}</span>
             </button>
           )}
         </div>
       </div>
     </div>
   );
+};
+
+// Add status colors
+const statusColors = {
+  upcoming: "info",
+  ongoing: "success",
+  completed: "success",
+  cancelled: "error",
+  postponed: "warning",
 };
 
 export default EventDetailsModal;

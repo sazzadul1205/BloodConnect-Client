@@ -1,7 +1,7 @@
 ﻿// Pages/backend/Donor/DonationEvents/DonationEvents.jsx
 
 // React
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState, useEffect } from "react";
 
 // TanStack Query
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -88,6 +88,7 @@ const eventTypeConfig = {
   drive: { icon: FaHeartbeat, color: "error", label: "Blood Drive" },
   emergency: { icon: FaTimesCircle, color: "warning", label: "Emergency" },
   regular: { icon: FaCalendarAlt, color: "info", label: "Regular" },
+  camp: { icon: FaUsers, color: "success", label: "Blood Camp" },
 };
 
 // Status colors
@@ -123,6 +124,8 @@ const DonationEvents = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState(null);
   const [actionLoadingId, setActionLoadingId] = useState("");
+  // eslint-disable-next-line no-unused-vars
+  const [modalElement, setModalElement] = useState(null);
 
   // Map state
   const [coords, setCoords] = useState({
@@ -142,6 +145,11 @@ const DonationEvents = () => {
     () => (token ? { Authorization: `Bearer ${token}` } : {}),
     [token],
   );
+
+  // Get modal element after component mounts
+  useEffect(() => {
+    setModalElement(document.getElementById("event_details_modal"));
+  }, []);
 
   // Helper function to show SweetAlert with theme support
   const showAlert = useCallback(async (options) => {
@@ -182,6 +190,7 @@ const DonationEvents = () => {
     isLoading,
     error,
     refetch,
+    isFetching,
   } = useQuery({
     queryKey: queryKeys.events(queryParams),
     queryFn: async () => {
@@ -199,6 +208,7 @@ const DonationEvents = () => {
     isLoading: nearbyLoading,
     error: nearbyError,
     refetch: refetchNearby,
+    isFetching: nearbyFetching,
   } = useQuery({
     queryKey: queryKeys.nearbyEvents(coords),
     queryFn: async () => {
@@ -246,11 +256,31 @@ const DonationEvents = () => {
   // Register for event mutation
   const registerMutation = useMutation({
     mutationFn: async (eventId) => {
-      await axiosInstance.post(
-        `/donation-events/${eventId}/register`,
-        {},
-        { headers: authHeaders }
-      );
+      try {
+        const response = await axiosInstance.post(
+          `/donation-events/${eventId}/register`,
+          {},
+          {
+            headers: authHeaders,
+            timeout: 10000 // 10 second timeout
+          }
+        );
+        return response.data;
+      } catch (error) {
+        // Log the full error for debugging
+        console.error("Registration error details:", {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          headers: error.response?.headers,
+          config: {
+            url: error.config?.url,
+            method: error.config?.method,
+            headers: error.config?.headers
+          }
+        });
+        throw error;
+      }
     },
     onSuccess: async () => {
       await showAlert({
@@ -275,11 +305,49 @@ const DonationEvents = () => {
         queryClient.invalidateQueries({ queryKey: queryKeys.eventDetails(selectedEventId) });
       }
     },
-    onError: async (err) => {
+    onError: async (error) => {
+      // Get the error message from the response
+      const errorMessage = error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Could not register for this event.";
+
+      // Show different messages based on error type
+      let title = "Registration Failed";
+      let icon = "error";
+
+      // Check for specific error conditions from your API
+      if (error.response?.status === 400) {
+        if (errorMessage.toLowerCase().includes("full capacity") ||
+          errorMessage.toLowerCase().includes("full")) {
+          title = "Event Full";
+        } else if (errorMessage.toLowerCase().includes("already registered")) {
+          title = "Already Registered";
+        } else if (errorMessage.toLowerCase().includes("age")) {
+          title = "Age Requirement Not Met";
+        } else if (errorMessage.toLowerCase().includes("weight")) {
+          title = "Weight Requirement Not Met";
+        } else if (errorMessage.toLowerCase().includes("blood type")) {
+          title = "Blood Type Not Accepted";
+        } else if (errorMessage.toLowerCase().includes("eligible")) {
+          title = "Not Eligible";
+        } else if (errorMessage.toLowerCase().includes("completed") ||
+          errorMessage.toLowerCase().includes("cancelled")) {
+          title = "Event Unavailable";
+        }
+      } else if (error.response?.status === 401) {
+        title = "Authentication Required";
+      } else if (error.response?.status === 403) {
+        title = "Access Denied";
+      } else if (error.response?.status === 404) {
+        title = "Event Not Found";
+      } else if (error.response?.status === 409) {
+        title = "Already Registered";
+      }
+
       await showAlert({
-        title: "Registration Failed",
-        text: err?.response?.data?.error || "Could not register for this event.",
-        icon: "error",
+        title: title,
+        text: errorMessage,
+        icon: icon,
         confirmButtonColor: "#ef4444",
       });
     },
@@ -324,6 +392,117 @@ const DonationEvents = () => {
       });
     },
   });
+
+  // Check if donor is registered for an event
+  const isRegistered = useCallback(
+    (event) => {
+      if (!donorId || !event) return false;
+
+      const currentDonorId = String(donorId || "");
+      if (!currentDonorId) return false;
+
+      // Check both registeredDonors array and donorId field
+      const registrations = event?.registeredDonors || [];
+      return registrations.some((registration) => {
+        const regDonorId = getId(registration?.donorId || registration?.donor || registration);
+        return String(regDonorId) === currentDonorId;
+      });
+    },
+    [donorId],
+  );
+
+  // Check registration eligibility
+  const checkRegistrationEligibility = useCallback(async (event) => {
+    if (!event) return { eligible: false, reason: "Event not found" };
+
+    // Check if event is full
+    if (event.spotsLeft === 0 || event.registrationStatus === 'full') {
+      return { eligible: false, reason: "Event is full" };
+    }
+
+    // Check if already registered
+    if (isRegistered(event)) {
+      return { eligible: false, reason: "You are already registered for this event" };
+    }
+
+    // Check event status
+    if (event.status?.current === "completed" || event.status?.current === "cancelled") {
+      return { eligible: false, reason: `Event is ${event.status.current}` };
+    }
+
+    // Check if event has started
+    const now = new Date();
+    const eventStart = event.schedule?.startDate ? new Date(event.schedule.startDate) : null;
+    if (eventStart && now > eventStart) {
+      return { eligible: false, reason: "Event has already started" };
+    }
+
+    return { eligible: true };
+  }, [isRegistered]);
+
+  // Handle register with eligibility check
+  const handleRegister = useCallback(async (eventId) => {
+    if (!eventId) return;
+
+    // Find the event from current list
+    const currentEvents = activeTab === 'nearby' ? nearbyEvents : events;
+    const event = currentEvents.find(e => getId(e._id) === eventId);
+
+    if (!event) {
+      await showAlert({
+        title: "Error",
+        text: "Event not found",
+        icon: "error",
+        confirmButtonColor: "#ef4444",
+      });
+      return;
+    }
+
+    // Check eligibility
+    const { eligible, reason } = await checkRegistrationEligibility(event);
+
+    if (!eligible) {
+      await showAlert({
+        title: "Cannot Register",
+        text: reason,
+        icon: "warning",
+        confirmButtonColor: "#ef4444",
+      });
+      return;
+    }
+
+    setActionLoadingId(eventId);
+    try {
+      await registerMutation.mutateAsync(eventId);
+    } finally {
+      setActionLoadingId("");
+    }
+  }, [events, nearbyEvents, activeTab, checkRegistrationEligibility, registerMutation, showAlert]);
+
+  // Handle cancel registration
+  const handleCancelRegistration = useCallback(async (eventId) => {
+    if (!eventId) return;
+
+    const result = await showAlert({
+      title: "Cancel Registration?",
+      text: "Are you sure you want to cancel your registration for this event?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, cancel",
+      cancelButtonText: "No, keep",
+    });
+
+    if (!result.isConfirmed) return;
+
+    setActionLoadingId(eventId);
+    try {
+      await cancelRegistrationMutation.mutateAsync(eventId);
+    } finally {
+      setActionLoadingId("");
+    }
+  }, [cancelRegistrationMutation, showAlert]);
 
   // Handle tab change
   const handleTabChange = useCallback((tab) => {
@@ -370,39 +549,6 @@ const DonationEvents = () => {
     document.getElementById("event_details_modal")?.close();
   }, []);
 
-  // Handle register
-  const handleRegister = useCallback(async (eventId) => {
-    setActionLoadingId(eventId);
-    try {
-      await registerMutation.mutateAsync(eventId);
-    } finally {
-      setActionLoadingId("");
-    }
-  }, [registerMutation]);
-
-  // Handle cancel registration
-  const handleCancelRegistration = useCallback(async (eventId) => {
-    const result = await showAlert({
-      title: "Cancel Registration?",
-      text: "Are you sure you want to cancel your registration for this event?",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
-      confirmButtonText: "Yes, cancel",
-      cancelButtonText: "No, keep",
-    });
-
-    if (!result.isConfirmed) return;
-
-    setActionLoadingId(eventId);
-    try {
-      await cancelRegistrationMutation.mutateAsync(eventId);
-    } finally {
-      setActionLoadingId("");
-    }
-  }, [cancelRegistrationMutation, showAlert]);
-
   // Get user's current location
   const useMyLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -414,6 +560,16 @@ const DonationEvents = () => {
       });
       return;
     }
+
+    // Show loading indicator
+    Swal.fire({
+      title: "Getting Location...",
+      text: "Please allow location access when prompted.",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+      background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+      color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+    });
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -433,12 +589,25 @@ const DonationEvents = () => {
           showConfirmButton: false,
         });
       },
-      async () => {
+      async (error) => {
         Swal.close();
+
+        let errorMessage = "Unable to read your location.";
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location access denied. You can enter coordinates manually.";
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable.";
+            break;
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out.";
+            break;
+        }
 
         await showAlert({
           title: "Location Access Failed",
-          text: "Unable to read your location. You can enter coordinates manually.",
+          text: errorMessage,
           icon: "warning",
           confirmButtonColor: "#ef4444",
         });
@@ -450,21 +619,6 @@ const DonationEvents = () => {
       }
     );
   }, [showAlert]);
-
-  // Check if donor is registered for an event
-  const isRegistered = useCallback(
-    (event) => {
-      const currentDonorId = String(donorId || "");
-      if (!currentDonorId) return false;
-
-      const registrations = event?.registeredDonors || [];
-      return registrations.some((registration) => {
-        const regDonorId = getId(registration?.donorId || registration?.donor);
-        return String(regDonorId) === currentDonorId;
-      });
-    },
-    [donorId],
-  );
 
   // Filter events based on blood type filter
   const filteredEvents = useMemo(() => {
@@ -481,7 +635,7 @@ const DonationEvents = () => {
   }, [events, nearbyEvents, filters.bloodType, activeTab]);
 
   // Determine loading and error states
-  const isLoadingData = activeTab === 'nearby' ? nearbyLoading : isLoading;
+  const isLoadingData = activeTab === 'nearby' ? (nearbyLoading || nearbyFetching) : (isLoading || isFetching);
   const errorData = activeTab === 'nearby' ? nearbyError : error;
 
   // Loading state
@@ -519,7 +673,7 @@ const DonationEvents = () => {
             onClick={() => handleTabChange('all')}
             disabled={isLoadingData}
           >
-            All Events
+            All
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -573,7 +727,7 @@ const DonationEvents = () => {
             onClick={() => setFilterOpen(!filterOpen)}
           >
             <FiFilter size={12} />
-            {filterOpen ? 'Hide Filters' : 'Show Filters'}
+            {filterOpen ? 'Hide' : 'Show'} Filters
           </button>
         </div>
 
@@ -599,7 +753,7 @@ const DonationEvents = () => {
             type="number"
             min="1000"
             step="1000"
-            placeholder="Radius (meters)"
+            placeholder="Radius (m)"
             className="input input-bordered input-xs sm:input-sm w-full"
             value={coords.radius}
             onChange={(e) => setCoords((prev) => ({ ...prev, radius: parseInt(e.target.value) || 50000 }))}
@@ -610,7 +764,7 @@ const DonationEvents = () => {
             onClick={useMyLocation}
           >
             <FiNavigation size={12} />
-            Use My Location
+            My Location
           </button>
         </div>
 
@@ -630,7 +784,7 @@ const DonationEvents = () => {
                   value={filters.eventType}
                   onChange={(e) => setFilters(prev => ({ ...prev, eventType: e.target.value }))}
                 >
-                  <option value="">All Event Types</option>
+                  <option value="">All Types</option>
                   {Object.entries(eventTypeConfig).map(([value, config]) => (
                     <option key={value} value={value}>{config.label}</option>
                   ))}
@@ -691,7 +845,7 @@ const DonationEvents = () => {
               const typeColor = eventTypeConfig[eventType]?.color || 'info';
               const status = event?.status?.current || 'upcoming';
               const spotsLeft = event?.spotsLeft ?? 0;
-              const isFull = spotsLeft === 0;
+              const isFull = spotsLeft === 0 || event?.registrationStatus === 'full';
 
               return (
                 <motion.div
@@ -731,16 +885,16 @@ const DonationEvents = () => {
                         </span>
                         <span className="flex items-center gap-1 truncate">
                           <FiMapPin className="opacity-70 shrink-0" size={12} />
-                          <span className="truncate">{event?.location?.venue || event?.location?.address || "Location unavailable"}</span>
+                          <span className="truncate">{event?.location?.venue || event?.location?.address || "Location"}</span>
                         </span>
                         <span className="flex items-center gap-1 truncate">
                           <FaHospital className="opacity-70 shrink-0" size={12} />
-                          <span className="truncate">{event?.bloodBank?.name || "Blood bank unavailable"}</span>
+                          <span className="truncate">{event?.bloodBank?.name || "Blood bank"}</span>
                         </span>
                         <span className="flex items-center gap-1">
                           <FaUsers className="opacity-70 shrink-0" size={12} />
                           <span className={spotsLeft < 10 ? 'text-error font-semibold' : ''}>
-                            {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''} left
+                            {spotsLeft} spot{spotsLeft !== 1 ? 's' : ''}
                           </span>
                         </span>
                       </div>
@@ -770,7 +924,7 @@ const DonationEvents = () => {
                           ) : (
                             <FiXCircle size={12} />
                           )}
-                          <span className="hidden sm:inline">{busy ? "Cancelling..." : "Cancel"}</span>
+                          <span className="hidden sm:inline">{busy ? "..." : "Cancel"}</span>
                         </button>
                       ) : (
                         <button
@@ -785,7 +939,7 @@ const DonationEvents = () => {
                             <FiCheckCircle size={12} />
                           )}
                           <span className="hidden sm:inline">
-                            {busy ? "Registering..." : isFull ? "Full" : "Register"}
+                            {busy ? "..." : isFull ? "Full" : "Register"}
                           </span>
                         </button>
                       )}
@@ -807,8 +961,8 @@ const DonationEvents = () => {
             <p className="text-base sm:text-lg font-medium mb-1">No Events Found</p>
             <p className="text-xs sm:text-sm opacity-70">
               {activeTab === 'nearby'
-                ? "No donation events found near your location. Try increasing the radius or check back later."
-                : "No donation events match your current filters. Try adjusting your search criteria."}
+                ? "No events near you. Try increasing the radius."
+                : "No events match your filters."}
             </p>
           </motion.div>
         )}
