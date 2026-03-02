@@ -209,7 +209,7 @@ const DonorDashboard = () => {
   }
 
   return (
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
+    <div className="space-y-6 min-h-screen bg-base-200 p-5">
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>

@@ -370,8 +370,8 @@ const Backend_Layout = ({ userType }) => {
 
         {/* Page Content - Scrolls with main container */}
         <div className={`flex-1 ${isMobile ? 'pb-24' : ''}`}>
-          <div className="p-4 sm:p-6">
-            <div className="bg-base-100 rounded-2xl shadow-sm border border-base-300 p-4 sm:p-6">
+          <div className="p-0 md:p-4">
+            <div className="bg-base-100 rounded-2xl shadow-sm border border-base-300 p-0 md:p-4">
               <Outlet />
             </div>
           </div>
