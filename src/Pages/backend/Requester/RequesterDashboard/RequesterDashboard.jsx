@@ -54,7 +54,7 @@ const formatDateTime = (value) => {
   return formatAppDateTime(value, "MMM d, yyyy p", "Invalid Date");
 };
 
-// Status colors mapping
+// Status colors mapping for badges
 const statusColors = {
   pending: "warning",
   matched: "info",
@@ -67,12 +67,13 @@ const RequesterDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { axiosInstance } = useAxiosPublic();
 
-  // Get requester ID from user object
+  // Get requester ID from user object using utility function
   const requesterId = useMemo(
     () => getUserId(user),
     [user],
   );
 
+  // Fetch dashboard data using TanStack Query
   const {
     data: dashboardData,
     isLoading,
@@ -82,7 +83,7 @@ const RequesterDashboard = () => {
     refetch,
   } = useQuery({
     queryKey: ["requester-dashboard", requesterId],
-    enabled: !authLoading,
+    enabled: !authLoading && !!requesterId, // Only run when not loading and requesterId exists
     queryFn: async () => {
       if (!requesterId) {
         throw new Error("Requester ID not found. Please log in again.");
@@ -91,7 +92,7 @@ const RequesterDashboard = () => {
       const token = localStorage.getItem("auth_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
-      // Fetch requester profile and blood requests in parallel
+      // Fetch requester profile and blood requests in parallel for better performance
       const [profileRes, requestsRes] = await Promise.all([
         axiosInstance.get(`/users/profile/${requesterId}`, { headers }),
         axiosInstance.get("/blood-requests", { headers }),
@@ -99,6 +100,8 @@ const RequesterDashboard = () => {
 
       const requester = profileRes?.data?.data || null;
       const allRequests = requestsRes?.data?.data || [];
+
+      // Filter requests belonging to this requester
       const bloodRequests = allRequests.filter(
         (request) => String(getId(request.requesterId)) === String(requesterId),
       );
@@ -113,7 +116,10 @@ const RequesterDashboard = () => {
     [dashboardData?.bloodRequests],
   );
 
-  // Calculate request statistics
+  /**
+   * Calculate comprehensive request statistics
+   * This memoized value updates only when bloodRequests changes
+   */
   const requestStats = useMemo(() => {
     const total = bloodRequests.length;
     const pending = bloodRequests.filter(r => r?.status?.current === "pending").length;
@@ -131,7 +137,7 @@ const RequesterDashboard = () => {
       .filter(r => r?.status?.current === "fulfilled")
       .reduce((sum, r) => sum + (r?.requestDetails?.units || 0), 0);
 
-    // Calculate response statistics from matches
+    // Calculate response statistics from donor matches
     let totalResponses = 0;
     let acceptedResponses = 0;
     let pendingResponses = 0;
@@ -149,7 +155,7 @@ const RequesterDashboard = () => {
       }
     });
 
-    // Get urgent requests (emergency or urgent)
+    // Get urgent requests (emergency or urgent priority)
     const urgentRequests = bloodRequests.filter(r =>
       r?.requestDetails?.urgency === "emergency" ||
       r?.requestDetails?.urgency === "urgent"
@@ -162,7 +168,7 @@ const RequesterDashboard = () => {
       fulfilled,
       cancelled,
       expired,
-      activeRequests: pending + matched,
+      activeRequests: pending + matched, // Requests that are still active
       totalUnitsRequested,
       totalUnitsFulfilled,
       totalResponses,
@@ -174,7 +180,9 @@ const RequesterDashboard = () => {
     };
   }, [bloodRequests]);
 
-  // Get recent 5 requests
+  /**
+   * Get the 5 most recent requests sorted by creation date
+   */
   const recentRequests = useMemo(() => {
     return [...bloodRequests]
       .sort((a, b) => {
@@ -185,7 +193,9 @@ const RequesterDashboard = () => {
       .slice(0, 5);
   }, [bloodRequests]);
 
-  // Get requests with pending responses
+  /**
+   * Get requests that have pending donor responses
+   */
   const requestsWithPendingResponses = useMemo(() => {
     return bloodRequests
       .filter(request =>
@@ -203,7 +213,9 @@ const RequesterDashboard = () => {
       .slice(0, 5);
   }, [bloodRequests]);
 
-  // Get requests by blood type
+  /**
+   * Count active requests by blood type
+   */
   const requestsByBloodType = useMemo(() => {
     const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
     const counts = {};
@@ -219,7 +231,9 @@ const RequesterDashboard = () => {
     return counts;
   }, [bloodRequests]);
 
-  // Get urgent requests summary
+  /**
+   * Get urgent/emergency requests that need immediate attention
+   */
   const urgentRequestsList = useMemo(() => {
     return bloodRequests
       .filter(r =>
@@ -236,88 +250,114 @@ const RequesterDashboard = () => {
       .slice(0, 3);
   }, [bloodRequests]);
 
-  // Loading state
+  // Loading state - show blood loader animation
   if (isLoading || authLoading) return <BloodLoader />;
 
-  // Error state
+  // Error state - show error with retry option
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
   return (
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6">
+      {/* ==================== HEADER SECTION ==================== */}
+      {/* Responsive header with welcome message and action buttons */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        {/* Welcome Text */}
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <FaClipboardList className="text-primary" />
             Requester Dashboard
-          </h2>
-          <p className="text-sm text-base-content/70 mt-1">
-            Welcome back, <span className="font-semibold text-primary">{requester?.profile?.fullName || user?.profile?.fullName || "Requester"}</span>!
+          </h1>
+          <p className="text-xs sm:text-sm text-base-content/70 mt-1">
+            Welcome back, <span className="font-semibold text-primary">
+              {requester?.profile?.fullName || user?.profile?.fullName || "Requester"}
+            </span>!
             Track your blood requests and responses.
           </p>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        {/* Action Buttons - Responsive layout */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* New Request Button - Primary Action */}
           <Link
             to="/requester/create-request"
-            className="btn btn-sm btn-primary gap-2"
+            className="btn btn-xs sm:btn-sm btn-primary gap-1 sm:gap-2 flex-1 sm:flex-none"
           >
-            <FaDroplet />
-            New Request
+            <FaDroplet size={12} className="sm:hidden" />
+            <FaDroplet size={14} className="hidden sm:block" />
+            <span className="truncate">New Request</span>
           </Link>
+
+          {/* Settings Button */}
           <Link
             to="/requester/settings"
-            className="btn btn-sm btn-outline gap-2"
+            className="btn btn-xs sm:btn-sm btn-outline gap-1 sm:gap-2 flex-1 sm:flex-none"
           >
-            <FaUser />
-            Settings
+            <FaUser size={12} className="sm:hidden" />
+            <FaUser size={14} className="hidden sm:block" />
+            <span className="hidden sm:inline">Settings</span>
           </Link>
+
+          {/* Refresh Button */}
           <button
             type="button"
             onClick={() => refetch()}
-            className="btn btn-sm btn-primary gap-2"
+            className="btn btn-xs sm:btn-sm btn-primary gap-1 sm:gap-2"
             disabled={isFetching}
+            aria-label="Refresh data"
           >
-            <FiRefreshCw className={isFetching ? "animate-spin" : ""} />
-            {isFetching ? "Refreshing..." : "Refresh"}
+            <FiRefreshCw size={12} className={isFetching ? "animate-spin" : ""} />
+            <span className="hidden sm:inline">{isFetching ? "Refreshing..." : "Refresh"}</span>
           </button>
         </div>
       </div>
 
-      {/* Urgent Requests Alert */}
+      {/* ==================== URGENT REQUESTS ALERT ==================== */}
+      {/* Show alert banner when there are urgent requests */}
       {requestStats.urgentRequests > 0 && (
-        <div className="alert alert-error bg-error/10 border-error/20">
-          <FaExclamationCircle className="text-error" />
-          <span className="text-primary" >
-            You have <span className="font-semibold ">{requestStats.urgentRequests}</span> urgent{' '}
-            {requestStats.urgentRequests === 1 ? 'request' : 'requests'} that need attention.
-          </span>
-          <Link to="/requester/my-requests?urgency=urgent" className="btn btn-sm btn-error">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="alert alert-error bg-error/10 border-error/20 flex-col sm:flex-row gap-3"
+        >
+          <div className="flex items-center gap-2">
+            <FaExclamationCircle className="text-error text-lg sm:text-xl shrink-0" />
+            <span className="text-xs sm:text-sm text-base-content">
+              You have <span className="font-semibold text-error">{requestStats.urgentRequests}</span> urgent{' '}
+              {requestStats.urgentRequests === 1 ? 'request' : 'requests'} that need attention.
+            </span>
+          </div>
+          <Link
+            to="/requester/my-requests?urgency=urgent"
+            className="btn btn-xs sm:btn-sm btn-error w-full sm:w-auto"
+          >
             View Urgent Requests
           </Link>
-        </div>
+        </motion.div>
       )}
 
-      {/* Stats Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ==================== STATS CARDS GRID ==================== */}
+      {/* Responsive grid: 1 column on mobile, 2 on tablet, 4 on desktop */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Requests Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-4 sm:p-5 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-70 mb-1">Total Requests</p>
-              <p className="text-2xl font-bold text-primary">{requestStats.total}</p>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Total Requests</p>
+              <p className="stat-value text-2xl sm:text-3xl font-bold text-primary">
+                {requestStats.total}
+              </p>
             </div>
-            <div className="p-3 rounded-full bg-primary/10">
-              <FaClipboardList className="text-primary" size={24} />
+            <div className="stat-figure bg-primary/10 p-2 sm:p-3 rounded-full">
+              <FaClipboardList className="text-primary text-xl sm:text-2xl" />
             </div>
           </div>
-          <p className="text-xs opacity-60 mt-2">
+          <p className="stat-desc text-xs mt-2">
             Active: <span className="font-semibold text-warning">{requestStats.activeRequests}</span>
           </p>
         </motion.div>
@@ -327,18 +367,20 @@ const RequesterDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-4 sm:p-5 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-70 mb-1">Fulfilled</p>
-              <p className="text-2xl font-bold text-success">{requestStats.fulfilled}</p>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Fulfilled</p>
+              <p className="stat-value text-2xl sm:text-3xl font-bold text-success">
+                {requestStats.fulfilled}
+              </p>
             </div>
-            <div className="p-3 rounded-full bg-success/10">
-              <FaCheckCircle className="text-success" size={24} />
+            <div className="stat-figure bg-success/10 p-2 sm:p-3 rounded-full">
+              <FaCheckCircle className="text-success text-xl sm:text-2xl" />
             </div>
           </div>
-          <p className="text-xs opacity-60 mt-2">
+          <p className="stat-desc text-xs mt-2">
             Success rate: <span className="font-semibold">{requestStats.successRate}%</span>
           </p>
         </motion.div>
@@ -348,18 +390,20 @@ const RequesterDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-4 sm:p-5 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-70 mb-1">Pending Responses</p>
-              <p className="text-2xl font-bold text-warning">{requestStats.pendingResponses}</p>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Pending Responses</p>
+              <p className="stat-value text-2xl sm:text-3xl font-bold text-warning">
+                {requestStats.pendingResponses}
+              </p>
             </div>
-            <div className="p-3 rounded-full bg-warning/10">
-              <FaHourglassHalf className="text-warning" size={24} />
+            <div className="stat-figure bg-warning/10 p-2 sm:p-3 rounded-full">
+              <FaHourglassHalf className="text-warning text-xl sm:text-2xl" />
             </div>
           </div>
-          <p className="text-xs opacity-60 mt-2">
+          <p className="stat-desc text-xs mt-2">
             Total responses: <span className="font-semibold">{requestStats.totalResponses}</span>
           </p>
         </motion.div>
@@ -369,32 +413,40 @@ const RequesterDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-4 sm:p-5 hover:shadow-lg transition-shadow sm:col-span-2 xl:col-span-1"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm opacity-70 mb-1">Units Requested</p>
-              <p className="text-2xl font-bold text-info">{requestStats.totalUnitsRequested}</p>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Units Requested</p>
+              <p className="stat-value text-2xl sm:text-3xl font-bold text-info">
+                {requestStats.totalUnitsRequested}
+              </p>
             </div>
-            <div className="p-3 rounded-full bg-info/10">
-              <FaTint className="text-info" size={24} />
+            <div className="stat-figure bg-info/10 p-2 sm:p-3 rounded-full">
+              <FaTint className="text-info text-xl sm:text-2xl" />
             </div>
           </div>
-          <p className="text-xs opacity-60 mt-2">
+          <p className="stat-desc text-xs mt-2">
             Fulfilled: <span className="font-semibold">{requestStats.totalUnitsFulfilled}</span>
           </p>
         </motion.div>
       </div>
 
-      {/* Charts and Analytics Section */}
+      {/* ==================== CHARTS AND ANALYTICS SECTION ==================== */}
+      {/* Only show if there are requests */}
       {bloodRequests.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Requests by Status */}
-          <div className="bg-base-100 border border-base-300 rounded-lg p-5">
-            <h3 className="font-semibold flex items-center gap-2 mb-4">
+          {/* Requests by Status Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-base-100 border border-base-300 rounded-lg p-4 sm:p-5"
+          >
+            <h2 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-4">
               <FaFlask className="text-primary" />
               Requests by Status
-            </h3>
+            </h2>
             <div className="space-y-3">
               {[
                 { status: "pending", count: requestStats.pending, color: "warning" },
@@ -406,14 +458,14 @@ const RequesterDashboard = () => {
                 if (count === 0) return null;
                 const percentage = (count / requestStats.total) * 100;
                 return (
-                  <div key={status}>
-                    <div className="flex justify-between text-sm mb-1">
+                  <div key={status} className="space-y-1">
+                    <div className="flex justify-between text-xs sm:text-sm">
                       <span className="capitalize">{status}</span>
                       <span className="font-semibold">{count}</span>
                     </div>
-                    <div className="w-full bg-base-300 rounded-full h-2">
+                    <div className="w-full bg-base-300 rounded-full h-1.5 sm:h-2">
                       <div
-                        className={`bg-${color} h-2 rounded-full`}
+                        className={`bg-${color} h-1.5 sm:h-2 rounded-full transition-all duration-500`}
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -421,14 +473,19 @@ const RequesterDashboard = () => {
                 );
               })}
             </div>
-          </div>
+          </motion.div>
 
-          {/* Requests by Blood Type */}
-          <div className="bg-base-100 border border-base-300 rounded-lg p-5">
-            <h3 className="font-semibold flex items-center gap-2 mb-4">
+          {/* Requests by Blood Type Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="bg-base-100 border border-base-300 rounded-lg p-4 sm:p-5"
+          >
+            <h2 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-4">
               <FaDroplet className="text-primary" />
               Active Requests by Blood Type
-            </h3>
+            </h2>
             <div className="space-y-3">
               {Object.entries(requestsByBloodType)
                 .filter(([, count]) => count > 0)
@@ -436,14 +493,14 @@ const RequesterDashboard = () => {
                   const maxCount = Math.max(...Object.values(requestsByBloodType), 1);
                   const percentage = (count / maxCount) * 100;
                   return (
-                    <div key={bloodType}>
-                      <div className="flex justify-between text-sm mb-1">
+                    <div key={bloodType} className="space-y-1">
+                      <div className="flex justify-between text-xs sm:text-sm">
                         <span className="font-semibold">{bloodType}</span>
-                        <span>{count} {count === 1 ? 'request' : 'requests'}</span>
+                        <span>{count} {count === 1 ? 'req' : "req's"}</span>
                       </div>
-                      <div className="w-full bg-base-300 rounded-full h-2">
+                      <div className="w-full bg-base-300 rounded-full h-1.5 sm:h-2">
                         <div
-                          className="bg-primary h-2 rounded-full"
+                          className="bg-primary h-1.5 sm:h-2 rounded-full transition-all duration-500"
                           style={{ width: `${percentage}%` }}
                         />
                       </div>
@@ -451,52 +508,65 @@ const RequesterDashboard = () => {
                   );
                 })}
               {Object.values(requestsByBloodType).every(v => v === 0) && (
-                <p className="text-center text-base-content/70 py-4">
+                <p className="text-center text-base-content/70 py-4 text-sm">
                   No active requests
                 </p>
               )}
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
-      {/* Three Column Grid for Recent Requests, Pending Responses, Urgent */}
+      {/* ==================== THREE COLUMN GRID ==================== */}
+      {/* Recent Requests, Pending Responses, Urgent Requests */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Recent Requests */}
-        <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          <div className="p-4 border-b border-base-300 font-semibold flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        {/* Recent Requests Column */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="bg-base-100 border border-base-300 rounded-lg overflow-hidden flex flex-col"
+        >
+          {/* Column Header */}
+          <div className="p-3 sm:p-4 border-b border-base-300 font-semibold flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm sm:text-base">
               <FiClock className="text-primary" />
-              Recent Requests
+              <span>Recent Requests</span>
             </div>
-            <span className="badge badge-primary">{bloodRequests.length}</span>
+            <span className="badge badge-primary badge-sm">{bloodRequests.length}</span>
           </div>
 
+          {/* Scrollable Content Area */}
           {recentRequests.length > 0 ? (
             <div className="divide-y divide-base-300 max-h-80 overflow-y-auto">
               {recentRequests.map((request) => {
                 const urgency = request?.requestDetails?.urgency || "normal";
                 const requestId = getId(request?._id);
                 return (
-                  <div key={requestId} className="p-4 hover:bg-base-200 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
+                  <div key={requestId} className="p-3 sm:p-4 hover:bg-base-200 transition-colors">
+                    {/* Request Header */}
+                    <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
                       <div>
-                        <span className="font-semibold text-primary">
+                        <span className="font-semibold text-sm sm:text-base text-primary">
                           {safeString(request?.requestDetails?.bloodType)}
                         </span>
                         <span className="ml-2 text-xs opacity-70">
-                          {request?.requestDetails?.units || 0} units
+                          {request?.requestDetails?.units || 0}u
                         </span>
                       </div>
                       <span className={`badge badge-${statusColors[request?.status?.current] || "neutral"} badge-sm`}>
                         {request?.status?.current || "unknown"}
                       </span>
                     </div>
-                    <p className="text-sm flex items-center gap-1 mb-1">
-                      <FaHospital className="text-base-content/50" />
-                      {safeString(request?.patientInfo?.hospital) || "Unknown"}
+
+                    {/* Hospital Info */}
+                    <p className="text-xs sm:text-sm flex items-center gap-1 mb-2">
+                      <FaHospital className="text-base-content/50 shrink-0" />
+                      <span className="truncate">{safeString(request?.patientInfo?.hospital) || "Unknown"}</span>
                     </p>
-                    <div className="flex justify-between items-center mt-2">
+
+                    {/* Footer with Urgency and Date */}
+                    <div className="flex flex-wrap justify-between items-center gap-2">
                       <span className={`badge badge-${urgency === "emergency" ? "error" : urgency === "urgent" ? "warning" : "info"} badge-xs`}>
                         {urgency}
                       </span>
@@ -509,66 +579,83 @@ const RequesterDashboard = () => {
               })}
             </div>
           ) : (
-            <div className="p-8 text-center text-base-content/70">
-              <FiDroplet className="mx-auto text-3xl mb-2 opacity-50" />
-              <p className="text-sm">No requests yet</p>
+            // Empty State
+            <div className="p-6 sm:p-8 text-center text-base-content/70">
+              <FiDroplet className="mx-auto text-2xl sm:text-3xl mb-2 opacity-50" />
+              <p className="text-xs sm:text-sm">No requests yet</p>
               <Link to="/requester/create-request" className="btn btn-xs btn-primary mt-2">
                 Create First Request
               </Link>
             </div>
           )}
 
-          <div className="p-4 border-t border-base-300">
-            <Link to="/requester/my-requests" className="btn btn-sm btn-outline w-full gap-2">
+          {/* View All Link */}
+          <div className="p-3 sm:p-4 border-t border-base-300 mt-auto">
+            <Link to="/requester/my-requests" className="btn btn-xs sm:btn-sm btn-outline w-full gap-2">
               View All Requests
-              <FiArrowRight />
+              <FiArrowRight size={12} />
             </Link>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Pending Responses */}
-        <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          <div className="p-4 border-b border-base-300 font-semibold flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        {/* Pending Responses Column */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="bg-base-100 border border-base-300 rounded-lg overflow-hidden flex flex-col"
+        >
+          {/* Column Header */}
+          <div className="p-3 sm:p-4 border-b border-base-300 font-semibold flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm sm:text-base">
               <FaHourglassHalf className="text-warning" />
-              Pending Responses
+              <span>Pending Responses</span>
             </div>
-            <span className="badge badge-warning">{requestStats.pendingResponses}</span>
+            <span className="badge badge-warning badge-sm">{requestStats.pendingResponses}</span>
           </div>
 
+          {/* Scrollable Content Area */}
           {requestsWithPendingResponses.length > 0 ? (
             <div className="divide-y divide-base-300 max-h-80 overflow-y-auto">
               {requestsWithPendingResponses.map((request) => {
                 const requestId = getId(request?._id);
                 return (
-                  <div key={requestId} className="p-4 hover:bg-base-200 transition-colors">
+                  <div key={requestId} className="p-3 sm:p-4 hover:bg-base-200 transition-colors">
+                    {/* Request Header */}
                     <div className="flex justify-between items-start mb-2">
-                      <span className="font-semibold text-primary">
+                      <span className="font-semibold text-sm sm:text-base text-primary">
                         {safeString(request?.requestDetails?.bloodType)}
                       </span>
                       <span className="badge badge-warning badge-sm">
                         {request.pendingMatches?.length || 0} pending
                       </span>
                     </div>
-                    <p className="text-sm mb-2">
-                      Waiting for {request.pendingMatches?.length || 0} donor{request.pendingMatches?.length !== 1 ? 's' : ''} to respond
+
+                    {/* Description */}
+                    <p className="text-xs sm:text-sm mb-2">
+                      Waiting for {request.pendingMatches?.length || 0} donor
+                      {request.pendingMatches?.length !== 1 ? 's' : ''}
                     </p>
+
+                    {/* Donor Avatars */}
                     <div className="flex gap-1 mb-2">
                       {request.pendingMatches?.slice(0, 3).map((match, idx) => (
                         <div key={idx} className="avatar placeholder">
-                          <div className="bg-warning/20 text-warning rounded-full w-6 h-6">
-                            <span className="text-xs">D{idx + 1}</span>
+                          <div className="bg-warning/20 text-warning rounded-full w-5 h-5 sm:w-6 sm:h-6">
+                            <span className="text-[10px] sm:text-xs">D{idx + 1}</span>
                           </div>
                         </div>
                       ))}
                       {request.pendingMatches?.length > 3 && (
                         <div className="avatar placeholder">
-                          <div className="bg-base-300 rounded-full w-6 h-6">
-                            <span className="text-xs">+{request.pendingMatches.length - 3}</span>
+                          <div className="bg-base-300 rounded-full w-5 h-5 sm:w-6 sm:h-6">
+                            <span className="text-[10px] sm:text-xs">+{request.pendingMatches.length - 3}</span>
                           </div>
                         </div>
                       )}
                     </div>
+
+                    {/* View Link */}
                     <Link
                       to={`/blood-requests/${requestId}`}
                       className="btn btn-xs btn-ghost w-full"
@@ -580,56 +667,72 @@ const RequesterDashboard = () => {
               })}
             </div>
           ) : (
-            <div className="p-8 text-center text-base-content/70">
-              <FaHourglassHalf className="mx-auto text-3xl mb-2 opacity-50" />
-              <p className="text-sm">No pending responses</p>
+            // Empty State
+            <div className="p-6 sm:p-8 text-center text-base-content/70">
+              <FaHourglassHalf className="mx-auto text-2xl sm:text-3xl mb-2 opacity-50" />
+              <p className="text-xs sm:text-sm">No pending responses</p>
             </div>
           )}
 
-          <div className="p-4 border-t border-base-300">
-            <Link to="/requester/my-requests?status=pending" className="btn btn-sm btn-outline w-full gap-2">
+          {/* View All Link */}
+          <div className="p-3 sm:p-4 border-t border-base-300 mt-auto">
+            <Link to="/requester/my-requests?status=pending" className="btn btn-xs sm:btn-sm btn-outline w-full gap-2">
               View All Pending
-              <FiArrowRight />
+              <FiArrowRight size={12} />
             </Link>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Urgent Requests */}
-        <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
-          <div className="p-4 border-b border-base-300 font-semibold flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        {/* Urgent Requests Column */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="bg-base-100 border border-base-300 rounded-lg overflow-hidden flex flex-col"
+        >
+          {/* Column Header */}
+          <div className="p-3 sm:p-4 border-b border-base-300 font-semibold flex items-center justify-between">
+            <div className="flex items-center gap-2 text-sm sm:text-base">
               <FaExclamationCircle className="text-error" />
-              Urgent Requests
+              <span>Urgent Requests</span>
             </div>
-            <span className="badge badge-error">{urgentRequestsList.length}</span>
+            <span className="badge badge-error badge-sm">{urgentRequestsList.length}</span>
           </div>
 
+          {/* Scrollable Content Area */}
           {urgentRequestsList.length > 0 ? (
             <div className="divide-y divide-base-300 max-h-80 overflow-y-auto">
               {urgentRequestsList.map((request) => {
                 const requestId = getId(request?._id);
                 return (
-                  <div key={requestId} className="p-4 hover:bg-base-200 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
+                  <div key={requestId} className="p-3 sm:p-4 hover:bg-base-200 transition-colors">
+                    {/* Request Header */}
+                    <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
                       <div>
-                        <span className="font-semibold text-error">
+                        <span className="font-semibold text-sm sm:text-base text-error">
                           {safeString(request?.requestDetails?.bloodType)}
                         </span>
                         <span className="ml-2 text-xs opacity-70">
-                          {request?.requestDetails?.units || 0} units
+                          {request?.requestDetails?.units || 0}u
                         </span>
                       </div>
                       <span className={`badge badge-${request?.requestDetails?.urgency === "emergency" ? "error" : "warning"} badge-sm`}>
                         {request?.requestDetails?.urgency || "urgent"}
                       </span>
                     </div>
-                    <p className="text-sm flex items-center gap-1 mb-1">
-                      <FaHospital className="text-base-content/50" />
-                      {safeString(request?.patientInfo?.hospital) || "Unknown"}
+
+                    {/* Hospital Info */}
+                    <p className="text-xs sm:text-sm flex items-center gap-1 mb-2">
+                      <FaHospital className="text-base-content/50 shrink-0" />
+                      <span className="truncate">{safeString(request?.patientInfo?.hospital) || "Unknown"}</span>
                     </p>
+
+                    {/* Required By Date */}
                     <p className="text-xs opacity-70 mb-2">
                       Required by: {formatDate(request?.requestDetails?.requiredBy)}
                     </p>
+
+                    {/* Action Button */}
                     <Link
                       to={`/blood-requests/${requestId}`}
                       className="btn btn-xs btn-error w-full"
@@ -641,28 +744,38 @@ const RequesterDashboard = () => {
               })}
             </div>
           ) : (
-            <div className="p-8 text-center text-base-content/70">
-              <FaCheckCircle className="mx-auto text-3xl mb-2 opacity-50 text-success" />
-              <p className="text-sm">No urgent requests</p>
+            // Empty State
+            <div className="p-6 sm:p-8 text-center text-base-content/70">
+              <FaCheckCircle className="mx-auto text-2xl sm:text-3xl mb-2 opacity-50 text-success" />
+              <p className="text-xs sm:text-sm">No urgent requests</p>
             </div>
           )}
 
-          <div className="p-4 border-t border-base-300">
-            <Link to="/requester/my-requests?urgency=urgent,emergency" className="btn btn-sm btn-outline w-full gap-2">
+          {/* View All Link */}
+          <div className="p-3 sm:p-4 border-t border-base-300 mt-auto">
+            <Link to="/requester/my-requests?urgency=urgent,emergency" className="btn btn-xs sm:btn-sm btn-outline w-full gap-2">
               View All Urgent
-              <FiArrowRight />
+              <FiArrowRight size={12} />
             </Link>
           </div>
-        </div>
+        </motion.div>
       </div>
 
-      {/* Recent Activity Timeline */}
+      {/* ==================== RECENT ACTIVITY TIMELINE ==================== */}
+      {/* Only show if there are recent requests */}
       {recentRequests.length > 0 && (
-        <div className="bg-base-100 border border-base-300 rounded-lg p-5">
-          <h3 className="font-semibold flex items-center gap-2 mb-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+          className="bg-base-100 border border-base-300 rounded-lg p-4 sm:p-5"
+        >
+          <h2 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-4">
             <FiClock className="text-primary" />
             Recent Activity
-          </h3>
+          </h2>
+
+          {/* Timeline Items */}
           <div className="space-y-4">
             {recentRequests.slice(0, 3).map((request, index) => {
               const status = request?.status?.current || "pending";
@@ -673,21 +786,24 @@ const RequesterDashboard = () => {
               if (status === "pending") StatusIcon = FaHourglassHalf;
 
               return (
-                <div key={index} className="flex items-start gap-4">
-                  <div className={`bg-${statusColor}/10 p-2 rounded-full`}>
-                    <StatusIcon className={`text-${statusColor}`} />
+                <div key={index} className="flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-4">
+                  {/* Status Icon */}
+                  <div className={`bg-${statusColor}/10 p-2 rounded-full w-fit`}>
+                    <StatusIcon className={`text-${statusColor} text-sm sm:text-base`} />
                   </div>
-                  <div className="flex-1">
-                    <div className="flex justify-between items-start">
+
+                  {/* Activity Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                       <div>
-                        <p className="font-semibold">
+                        <p className="font-semibold text-sm sm:text-base">
                           {safeString(request?.requestDetails?.bloodType)} Request - {safeString(request?.patientInfo?.patientName) || "Patient"}
                         </p>
-                        <p className="text-sm opacity-70">
+                        <p className="text-xs sm:text-sm opacity-70 truncate">
                           {request?.requestDetails?.units || 0} units • {safeString(request?.patientInfo?.hospital) || "Unknown"}
                         </p>
                       </div>
-                      <span className={`badge badge-${statusColor} badge-sm`}>
+                      <span className={`badge badge-${statusColor} badge-sm sm:self-start`}>
                         {status}
                       </span>
                     </div>
@@ -699,57 +815,73 @@ const RequesterDashboard = () => {
               );
             })}
           </div>
-        </div>
+        </motion.div>
       )}
 
-      {/* Quick Actions Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* ==================== QUICK ACTIONS GRID ==================== */}
+      {/* Responsive grid of action cards */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 1.1 }}
+        className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"
+      >
+        {/* New Request Quick Action */}
         <Link
           to="/requester/create-request"
-          className="bg-base-100 border border-base-300 rounded-lg p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
+          className="bg-base-100 border border-base-300 rounded-lg p-3 sm:p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
         >
-          <div className="bg-primary/10 p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
-            <FaDroplet className="text-primary" size={24} />
+          <div className="bg-primary/10 p-2 sm:p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
+            <FaDroplet className="text-primary text-lg sm:text-xl" />
           </div>
-          <p className="font-semibold text-sm">New Request</p>
+          <p className="font-semibold text-xs sm:text-sm">New Request</p>
         </Link>
 
+        {/* My Requests Quick Action */}
         <Link
           to="/requester/my-requests"
-          className="bg-base-100 border border-base-300 rounded-lg p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
+          className="bg-base-100 border border-base-300 rounded-lg p-3 sm:p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
         >
-          <div className="bg-primary/10 p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
-            <FaClipboardList className="text-primary" size={24} />
+          <div className="bg-primary/10 p-2 sm:p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
+            <FaClipboardList className="text-primary text-lg sm:text-xl" />
           </div>
-          <p className="font-semibold text-sm">My Requests</p>
+          <p className="font-semibold text-xs sm:text-sm">My Requests</p>
         </Link>
 
+        {/* Blood Banks Quick Action */}
         <Link
           to="/requester/blood-banks"
-          className="bg-base-100 border border-base-300 rounded-lg p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
+          className="bg-base-100 border border-base-300 rounded-lg p-3 sm:p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
         >
-          <div className="bg-primary/10 p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
-            <FiUsers className="text-primary" size={24} />
+          <div className="bg-primary/10 p-2 sm:p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
+            <FiUsers className="text-primary text-lg sm:text-xl" />
           </div>
-          <p className="font-semibold text-sm">Blood Banks</p>
+          <p className="font-semibold text-xs sm:text-sm">Blood Banks</p>
         </Link>
 
+        {/* Settings Quick Action */}
         <Link
           to="/requester/settings"
-          className="bg-base-100 border border-base-300 rounded-lg p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
+          className="bg-base-100 border border-base-300 rounded-lg p-3 sm:p-4 text-center hover:shadow-lg transition-all hover:border-primary/50 group"
         >
-          <div className="bg-primary/10 p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
-            <FaUser className="text-primary" size={24} />
+          <div className="bg-primary/10 p-2 sm:p-3 rounded-full w-fit mx-auto mb-2 group-hover:bg-primary/20 transition-colors">
+            <FaUser className="text-primary text-lg sm:text-xl" />
           </div>
-          <p className="font-semibold text-sm">Settings</p>
+          <p className="font-semibold text-xs sm:text-sm">Settings</p>
         </Link>
-      </div>
+      </motion.div>
 
-      {/* Footer Note */}
-      <div className="text-xs text-center text-base-content/60 flex items-center justify-center gap-2">
-        <FaShieldAlt className="inline" />
-        Your requests are shared with eligible donors in your area.
-      </div>
+      {/* ==================== FOOTER NOTE ==================== */}
+      {/* Privacy/Info footer */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.2 }}
+        className="text-xs text-center text-base-content/60 flex items-center justify-center gap-2 px-2"
+      >
+        <FaShieldAlt className="shrink-0" />
+        <span>Your requests are shared with eligible donors in your area.</span>
+      </motion.div>
     </div>
   );
 };

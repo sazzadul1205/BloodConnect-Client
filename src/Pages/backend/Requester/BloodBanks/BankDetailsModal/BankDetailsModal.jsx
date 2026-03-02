@@ -1,7 +1,8 @@
 // Pages/frontend/Requester/BloodBanks/BankDetailsModal/BankDetailsModal.jsx
 
 // React
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -11,9 +12,7 @@ import {
   FaHospital,
   FaBuilding,
   FaHeartbeat,
-
   FaGlobe,
-
   FaClock,
   FaTools,
   FaCheckCircle,
@@ -34,56 +33,108 @@ import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 // Utils
 import { formatDate, getBloodTypeColor } from "../utils";
 
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  bankDetails: (bankId) => ['bankDetails', bankId],
+};
+
+// ==================== CONSTANTS ====================
+
+// Days of week for hours display
+const daysOfWeek = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+
+// ==================== MAIN COMPONENT ====================
+
 const BankDetailsModal = ({ bankId, onClose }) => {
   const { axiosInstance } = useAxiosPublic();
 
   // States
-  const [loading, setLoading] = useState(true);
-  const [bankData, setBankData] = useState(null);
   const [activeTab, setActiveTab] = useState("inventory"); // inventory, contact, hours, about
 
-  // Fetch bank data on mount
-  useEffect(() => {
-    const fetchBankData = async () => {
-      if (!bankId) return;
+  // ==================== TANSTACK QUERY ====================
 
-      setLoading(true);
-      try {
-        const response = await axiosInstance.get(`/blood-banks/${bankId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
-        });
+  /**
+   * Fetch bank details using TanStack Query
+   * Automatically caches results and handles loading/error states
+   */
+  const {
+    data: bankData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: queryKeys.bankDetails(bankId),
+    queryFn: async () => {
+      if (!bankId) throw new Error("Bank ID is required");
 
-        if (response.data?.success) {
-          setBankData(response.data.data);
-        }
-      } catch (error) {
-        console.error("Error fetching bank data:", error);
-      } finally {
-        setLoading(false);
+      const response = await axiosInstance.get(`/blood-banks/${bankId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` },
+      });
+
+      if (response.data?.success) {
+        return response.data.data;
       }
-    };
+      throw new Error("Failed to fetch bank details");
+    },
+    enabled: !!bankId, // Only run when bankId is provided
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes cache
+  });
 
-    fetchBankData();
-  }, [bankId, axiosInstance]);
+  // ==================== HELPER FUNCTIONS ====================
 
-  // Get bank type icon and color
+  /**
+   * Get bank type icon and color - BUILD COMPATIBLE
+   * Returns static classes instead of dynamic strings
+   */
   const getBankTypeInfo = (type) => {
     const typeMap = {
-      government: { icon: FaBuilding, color: "primary", label: "Government" },
-      private: { icon: FaBuilding, color: "secondary", label: "Private" },
-      ngo: { icon: FaHeartbeat, color: "success", label: "NGO" },
-      hospital: { icon: FaHospital, color: "info", label: "Hospital" },
-    };
-    return (
-      typeMap[type] || {
+      government: {
+        icon: FaBuilding,
+        color: "badge-primary",
+        label: "Government",
+        bgColor: "from-primary to-primary/80"
+      },
+      private: {
+        icon: FaBuilding,
+        color: "badge-secondary",
+        label: "Private",
+        bgColor: "from-secondary to-secondary/80"
+      },
+      ngo: {
+        icon: FaHeartbeat,
+        color: "badge-success",
+        label: "NGO",
+        bgColor: "from-success to-success/80"
+      },
+      hospital: {
         icon: FaHospital,
-        color: "ghost",
-        label: type || "Blood Bank",
-      }
-    );
+        color: "badge-info",
+        label: "Hospital",
+        bgColor: "from-info to-info/80"
+      },
+    };
+
+    return typeMap[type] || {
+      icon: FaHospital,
+      color: "badge-ghost",
+      label: type || "Blood Bank",
+      bgColor: "from-base-300 to-base-300/80"
+    };
   };
 
-  // Get rating stars
+  /**
+   * Get rating stars
+   */
   const getRatingStars = (rating = 0, size = 16) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -103,16 +154,65 @@ const BankDetailsModal = ({ bankId, onClose }) => {
     return stars;
   };
 
-  // Get inventory status
+  /**
+   * Get inventory status - BUILD COMPATIBLE
+   */
   const getInventoryStatus = (units, threshold) => {
-    if (units === 0) return { status: "Out of Stock", color: "badge-error", icon: FaTimesCircle };
-    if (units <= threshold)
-      return { status: "Low Stock", color: "badge-warning", icon: FaTimesCircle };
-    return { status: "Available", color: "badge-success", icon: FaCheckCircle };
+    if (units === 0) return {
+      status: "Out of Stock",
+      color: "badge-error",
+      icon: FaTimesCircle
+    };
+    if (units <= threshold) return {
+      status: "Low Stock",
+      color: "badge-warning",
+      icon: FaTimesCircle
+    };
+    return {
+      status: "Available",
+      color: "badge-success",
+      icon: FaCheckCircle
+    };
   };
 
-  if (loading) return <BloodLoader fullscreen={false} />;
-  if (!bankData) return null;
+  /**
+   * Format day name for display
+   */
+  const formatDayName = (day) => {
+    return day.charAt(0).toUpperCase() + day.slice(1);
+  };
+
+  // ==================== LOADING & ERROR STATES ====================
+
+  if (isLoading) return <BloodLoader fullscreen={false} />;
+
+  if (error || !bankData) {
+    return (
+      <div className="modal-box w-11/12 max-w-4xl p-6 bg-base-100 mx-2 sm:mx-0">
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <FaTimesCircle className="text-5xl text-error mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Failed to Load Bank Details</h3>
+          <p className="text-base-content/70 mb-4">
+            {error?.message || "Could not load bank details. Please try again."}
+          </p>
+          <button
+            onClick={() => refetch()}
+            className="btn btn-error btn-sm gap-2"
+          >
+            Retry
+          </button>
+          <button
+            onClick={onClose}
+            className="btn btn-ghost btn-sm mt-2"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== DATA EXTRACTION ====================
 
   const bank = bankData;
   const typeInfo = getBankTypeInfo(bank.type);
@@ -127,130 +227,157 @@ const BankDetailsModal = ({ bankId, onClose }) => {
   const stats = bank.stats || {};
   const verification = bank.verification || {};
 
+  // ==================== RENDER ====================
+
   return (
-    <div className="modal-box w-11/12 max-w-4xl p-0 overflow-hidden bg-base-100">
-      {/* Header */}
-      <div className="bg-linear-to-r from-error to-error/80 p-6 text-white">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-4 rounded-full">
-              <TypeIcon size={32} />
+    <div className="modal-box w-11/12 max-w-4xl p-0 overflow-hidden bg-base-100 mx-2 sm:mx-0">
+
+      {/* ==================== HEADER ==================== */}
+      {/* Dynamic header with static gradient classes */}
+      <div className={`bg-linear-to-r ${typeInfo.bgColor} p-4 sm:p-6 text-white`}>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+
+          {/* Bank Info */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="bg-white/20 p-2 sm:p-4 rounded-full">
+              <TypeIcon size={20} className="sm:w-8 sm:h-8" />
             </div>
-            <div>
-              <h3 className="font-bold text-2xl">{bank.name}</h3>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="badge badge-ghost gap-1">
-                  <TypeIcon size={12} />
-                  {typeInfo.label}
+            <div className="min-w-0">
+              <h2 className="font-bold text-lg sm:text-2xl truncate">{bank.name}</h2>
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
+                {/* Bank Type Badge */}
+                <span className={`badge ${typeInfo.color} badge-sm sm:badge-md gap-1`}>
+                  <TypeIcon size={8} className="sm:w-3 sm:h-3" />
+                  <span className="text-[10px] sm:text-xs">{typeInfo.label}</span>
                 </span>
+
+                {/* Verified Badge */}
                 {verification.isVerified && (
-                  <span className="badge badge-success gap-1">
-                    <FaCheckCircle size={12} />
-                    Verified
+                  <span className="badge badge-success badge-sm sm:badge-md gap-1">
+                    <FaCheckCircle size={8} className="sm:w-3 sm:h-3" />
+                    <span className="text-[10px] sm:text-xs">Verified</span>
                   </span>
                 )}
-                <span className="text-white/80 text-sm">
+
+                {/* Registration Number */}
+                <span className="text-white/80 text-[10px] sm:text-sm truncate">
                   Reg: {bank.registrationNumber?.slice(-8) || "N/A"}
                 </span>
               </div>
             </div>
           </div>
+
+          {/* Close Button */}
           <button
             onClick={onClose}
-            className="btn btn-ghost btn-sm btn-circle text-white hover:bg-white/20"
+            className="btn btn-ghost btn-xs sm:btn-sm btn-circle text-white hover:bg-white/20 self-end sm:self-auto"
+            aria-label="Close modal"
           >
-            <FaTimes size={20} />
+            <FaTimes size={14} className="sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-4 bg-base-200/50 border-b border-base-300">
-        <div className="stat py-2">
+      {/* ==================== QUICK STATS ==================== */}
+      {/* Responsive grid: 2 cols on mobile, 4 on desktop */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 p-2 sm:p-4 bg-base-200/50 border-b border-base-300">
+
+        {/* Total Units */}
+        <div className="stat py-1 sm:py-2">
           <div className="stat-figure text-primary">
-            <FaTint />
+            <FaTint size={12} className="sm:w-4 sm:h-4" />
           </div>
-          <div className="stat-title text-xs">Total Units</div>
-          <div className="stat-value text-lg">
+          <div className="stat-title text-[10px] sm:text-xs">Total Units</div>
+          <div className="stat-value text-sm sm:text-lg">
             {inventory.reduce((acc, item) => acc + (item.units || 0), 0)}
           </div>
         </div>
-        <div className="stat py-2">
+
+        {/* Available Types */}
+        <div className="stat py-1 sm:py-2">
           <div className="stat-figure text-success">
-            <FaCheckCircle />
+            <FaCheckCircle size={12} className="sm:w-4 sm:h-4" />
           </div>
-          <div className="stat-title text-xs">Available Types</div>
-          <div className="stat-value text-lg">
+          <div className="stat-title text-[10px] sm:text-xs">Available</div>
+          <div className="stat-value text-sm sm:text-lg">
             {inventory.filter((item) => item.units > 0).length}/8
           </div>
         </div>
-        <div className="stat py-2">
+
+        {/* Rating */}
+        <div className="stat py-1 sm:py-2">
           <div className="stat-figure text-warning">
-            <FaStar />
+            <FaStar size={12} className="sm:w-4 sm:h-4" />
           </div>
-          <div className="stat-title text-xs">Rating</div>
-          <div className="stat-value text-lg">{stats.rating || "N/A"}</div>
+          <div className="stat-title text-[10px] sm:text-xs">Rating</div>
+          <div className="stat-value text-sm sm:text-lg">{stats.rating || "N/A"}</div>
         </div>
-        <div className="stat py-2">
+
+        {/* Distance */}
+        <div className="stat py-1 sm:py-2">
           <div className="stat-figure text-info">
-            <FiNavigation />
+            <FiNavigation size={12} className="sm:w-4 sm:h-4" />
           </div>
-          <div className="stat-title text-xs">Distance</div>
-          <div className="stat-value text-lg">
+          <div className="stat-title text-[10px] sm:text-xs">Distance</div>
+          <div className="stat-value text-sm sm:text-lg">
             {bank.distance ? `${bank.distance} km` : "N/A"}
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="tabs tabs-boxed bg-base-100 p-1 border-b border-base-300">
+      {/* ==================== TABS ==================== */}
+      {/* Responsive tabs - wrap on mobile */}
+      <div className="tabs tabs-boxed bg-base-100 p-1 border-b border-base-300 flex-wrap">
         <button
-          className={`tab ${activeTab === "inventory" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-md ${activeTab === "inventory" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("inventory")}
         >
-          <FaTint className="mr-2" size={14} />
-          Inventory
+          <FaTint className="mr-1 sm:mr-2" size={10} />
+          <span className="text-[10px] sm:text-sm">Inventory</span>
         </button>
         <button
-          className={`tab ${activeTab === "contact" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-md ${activeTab === "contact" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("contact")}
         >
-          <FiPhone className="mr-2" size={14} />
-          Contact
+          <FiPhone className="mr-1 sm:mr-2" size={10} />
+          <span className="text-[10px] sm:text-sm">Contact</span>
         </button>
         <button
-          className={`tab ${activeTab === "hours" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-md ${activeTab === "hours" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("hours")}
         >
-          <FaClock className="mr-2" size={14} />
-          Hours
+          <FaClock className="mr-1 sm:mr-2" size={10} />
+          <span className="text-[10px] sm:text-sm">Hours</span>
         </button>
         <button
-          className={`tab ${activeTab === "about" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-md ${activeTab === "about" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("about")}
         >
-          <FaInfoCircle className="mr-2" size={14} />
-          About
+          <FaInfoCircle className="mr-1 sm:mr-2" size={10} />
+          <span className="text-[10px] sm:text-sm">About</span>
         </button>
       </div>
 
-      {/* Content */}
-      <div className="p-6 max-h-[50vh] overflow-y-auto">
-        {/* Inventory Tab */}
+      {/* ==================== CONTENT ==================== */}
+      {/* Scrollable content area */}
+      <div className="p-3 sm:p-6 max-h-[40vh] sm:max-h-[50vh] overflow-y-auto">
+
+        {/* ==================== INVENTORY TAB ==================== */}
         {activeTab === "inventory" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="space-y-4"
+            className="space-y-3 sm:space-y-4"
           >
-            <div className="bg-base-200 rounded-lg p-4">
-              <h4 className="font-semibold flex items-center gap-2 mb-4">
-                <FaTint className="text-error" />
+            {/* Main Inventory */}
+            <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-3 sm:mb-4">
+                <FaTint className="text-error text-sm sm:text-base" />
                 Blood Inventory Status
-              </h4>
+              </h3>
 
               {inventory.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2 sm:space-y-3">
                   {inventory.map((item) => {
                     const status = getInventoryStatus(item.units || 0, item.threshold || 0);
                     const StatusIcon = status.icon;
@@ -258,18 +385,21 @@ const BankDetailsModal = ({ bankId, onClose }) => {
                     return (
                       <div
                         key={item.bloodType}
-                        className="flex items-center justify-between p-3 bg-base-300 rounded-lg"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 bg-base-300 rounded-lg gap-2"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          {/* Blood Type Circle */}
                           <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white"
+                            className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-white text-xs sm:text-sm"
                             style={{ backgroundColor: getBloodTypeColor(item.bloodType) }}
                           >
                             {item.bloodType}
                           </div>
+
+                          {/* Blood Type Info */}
                           <div>
-                            <p className="font-semibold">Type {item.bloodType}</p>
-                            <div className="flex gap-4 text-sm">
+                            <p className="font-semibold text-xs sm:text-sm">Type {item.bloodType}</p>
+                            <div className="flex flex-wrap gap-2 sm:gap-4 text-[10px] sm:text-xs">
                               <span>
                                 Units: <span className="font-bold">{item.units || 0}</span>
                               </span>
@@ -279,34 +409,36 @@ const BankDetailsModal = ({ bankId, onClose }) => {
                             </div>
                           </div>
                         </div>
-                        <span className={`badge ${status.color} gap-1`}>
-                          <StatusIcon size={10} />
-                          {status.status}
+
+                        {/* Status Badge */}
+                        <span className={`badge ${status.color} badge-xs sm:badge-sm gap-1 self-end sm:self-auto`}>
+                          <StatusIcon size={8} className="sm:w-3 sm:h-3" />
+                          <span className="text-[10px] sm:text-xs">{status.status}</span>
                         </span>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <p className="text-center text-base-content/70 py-4">
+                <p className="text-center text-base-content/70 py-3 sm:py-4 text-xs sm:text-sm">
                   No inventory data available
                 </p>
               )}
             </div>
 
-            {/* Blood Components */}
+            {/* Blood Components Table */}
             {inventory.some((item) => Object.values(item.components || {}).some((v) => v > 0)) && (
-              <div className="bg-base-200 rounded-lg p-4">
-                <h4 className="font-semibold mb-3">Blood Components</h4>
+              <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+                <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3">Blood Components</h3>
                 <div className="overflow-x-auto">
-                  <table className="table table-sm">
+                  <table className="table table-xs sm:table-sm w-full">
                     <thead>
                       <tr className="bg-base-300">
-                        <th>Type</th>
-                        <th>Whole Blood</th>
-                        <th>Plasma</th>
-                        <th>Platelets</th>
-                        <th>Cryo</th>
+                        <th className="text-[10px] sm:text-xs">Type</th>
+                        <th className="text-[10px] sm:text-xs">Whole</th>
+                        <th className="text-[10px] sm:text-xs">Plasma</th>
+                        <th className="text-[10px] sm:text-xs">Platelets</th>
+                        <th className="text-[10px] sm:text-xs">Cryo</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -314,11 +446,11 @@ const BankDetailsModal = ({ bankId, onClose }) => {
                         (item) =>
                           Object.values(item.components || {}).some((v) => v > 0) && (
                             <tr key={item.bloodType}>
-                              <td className="font-semibold">{item.bloodType}</td>
-                              <td>{item.components?.wholeBlood || 0}</td>
-                              <td>{item.components?.plasma || 0}</td>
-                              <td>{item.components?.platelets || 0}</td>
-                              <td>{item.components?.cryoprecipitate || 0}</td>
+                              <td className="font-semibold text-xs sm:text-sm">{item.bloodType}</td>
+                              <td className="text-xs sm:text-sm">{item.components?.wholeBlood || 0}</td>
+                              <td className="text-xs sm:text-sm">{item.components?.plasma || 0}</td>
+                              <td className="text-xs sm:text-sm">{item.components?.platelets || 0}</td>
+                              <td className="text-xs sm:text-sm">{item.components?.cryoprecipitate || 0}</td>
                             </tr>
                           )
                       )}
@@ -330,32 +462,33 @@ const BankDetailsModal = ({ bankId, onClose }) => {
           </motion.div>
         )}
 
-        {/* Contact Tab */}
+        {/* ==================== CONTACT TAB ==================== */}
         {activeTab === "contact" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="space-y-4"
+            className="space-y-3 sm:space-y-4"
           >
-            <div className="bg-base-200 rounded-lg p-4">
-              <h4 className="font-semibold flex items-center gap-2 mb-4">
-                <FiPhone className="text-error" />
+            {/* Contact Information */}
+            <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-3 sm:mb-4">
+                <FiPhone className="text-error text-sm sm:text-base" />
                 Contact Information
-              </h4>
+              </h3>
 
               {/* Phone Numbers */}
               {contact.phone?.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-sm opacity-70 mb-2">Phone Numbers</p>
-                  <div className="space-y-2">
+                <div className="mb-3 sm:mb-4">
+                  <p className="text-[10px] sm:text-xs opacity-70 mb-1 sm:mb-2">Phone Numbers</p>
+                  <div className="space-y-1 sm:space-y-2">
                     {contact.phone.map((phone, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <FiPhone size={14} className="text-error" />
-                        <a href={`tel:${phone}`} className="hover:text-error">
+                      <div key={index} className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                        <FiPhone size={10} className="sm:w-4 sm:h-4 text-error" />
+                        <a href={`tel:${phone}`} className="hover:text-error truncate">
                           {phone}
                         </a>
                         {index === 0 && (
-                          <span className="badge badge-sm badge-error">Primary</span>
+                          <span className="badge badge-xs sm:badge-sm badge-error">Primary</span>
                         )}
                       </div>
                     ))}
@@ -365,11 +498,11 @@ const BankDetailsModal = ({ bankId, onClose }) => {
 
               {/* Email */}
               {contact.email && (
-                <div className="mb-4">
-                  <p className="text-sm opacity-70 mb-2">Email</p>
-                  <div className="flex items-center gap-2">
-                    <FiMail size={14} className="text-error" />
-                    <a href={`mailto:${contact.email}`} className="hover:text-error">
+                <div className="mb-3 sm:mb-4">
+                  <p className="text-[10px] sm:text-xs opacity-70 mb-1 sm:mb-2">Email</p>
+                  <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                    <FiMail size={10} className="sm:w-4 sm:h-4 text-error" />
+                    <a href={`mailto:${contact.email}`} className="hover:text-error break-all">
                       {contact.email}
                     </a>
                   </div>
@@ -378,15 +511,15 @@ const BankDetailsModal = ({ bankId, onClose }) => {
 
               {/* Website */}
               {contact.website && (
-                <div className="mb-4">
-                  <p className="text-sm opacity-70 mb-2">Website</p>
-                  <div className="flex items-center gap-2">
-                    <FaGlobe size={14} className="text-error" />
+                <div className="mb-3 sm:mb-4">
+                  <p className="text-[10px] sm:text-xs opacity-70 mb-1 sm:mb-2">Website</p>
+                  <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                    <FaGlobe size={10} className="sm:w-4 sm:h-4 text-error" />
                     <a
                       href={contact.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:text-error"
+                      className="hover:text-error truncate"
                     >
                       {contact.website}
                     </a>
@@ -396,10 +529,10 @@ const BankDetailsModal = ({ bankId, onClose }) => {
 
               {/* Emergency Contact */}
               {contact.emergency && (
-                <div className="mt-4 pt-4 border-t border-base-300">
-                  <p className="text-sm opacity-70 mb-2">Emergency Contact</p>
-                  <div className="flex items-center gap-2 text-error">
-                    <FiPhone size={14} />
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-base-300">
+                  <p className="text-[10px] sm:text-xs opacity-70 mb-1 sm:mb-2">Emergency Contact</p>
+                  <div className="flex items-center gap-1 sm:gap-2 text-error text-xs sm:text-sm">
+                    <FiPhone size={10} className="sm:w-4 sm:h-4" />
                     <a href={`tel:${contact.emergency}`} className="font-semibold">
                       {contact.emergency}
                     </a>
@@ -409,15 +542,17 @@ const BankDetailsModal = ({ bankId, onClose }) => {
             </div>
 
             {/* Address */}
-            <div className="bg-base-200 rounded-lg p-4">
-              <h4 className="font-semibold flex items-center gap-2 mb-4">
-                <FiMapPin className="text-error" />
+            <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-3 sm:mb-4">
+                <FiMapPin className="text-error text-sm sm:text-base" />
                 Location
-              </h4>
+              </h3>
 
-              <div className="space-y-2">
-                <p className="font-medium">{address.street || "Address not available"}</p>
-                <p className="text-base-content/70">
+              <div className="space-y-1 sm:space-y-2">
+                <p className="font-medium text-xs sm:text-sm wrap-break-word">
+                  {address.street || "Address not available"}
+                </p>
+                <p className="text-[10px] sm:text-xs text-base-content/70 wrap-break-word">
                   {address.city && address.state
                     ? `${address.city}, ${address.state} ${address.zipCode || ""}`
                     : "Location details not available"}
@@ -431,10 +566,10 @@ const BankDetailsModal = ({ bankId, onClose }) => {
                     )}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="btn btn-sm btn-outline btn-error gap-2 mt-2"
+                    className="btn btn-xs sm:btn-sm btn-outline btn-error gap-1 sm:gap-2 mt-2 w-full sm:w-auto"
                   >
-                    <FiNavigation size={14} />
-                    Get Directions
+                    <FiNavigation size={10} className="sm:w-4 sm:h-4" />
+                    <span className="text-[10px] sm:text-xs">Get Directions</span>
                   </a>
                 )}
               </div>
@@ -442,39 +577,33 @@ const BankDetailsModal = ({ bankId, onClose }) => {
           </motion.div>
         )}
 
-        {/* Hours Tab */}
+        {/* ==================== HOURS TAB ==================== */}
         {activeTab === "hours" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="space-y-4"
+            className="space-y-3 sm:space-y-4"
           >
-            <div className="bg-base-200 rounded-lg p-4">
-              <h4 className="font-semibold flex items-center gap-2 mb-4">
-                <FaClock className="text-error" />
+            <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-3 sm:mb-4">
+                <FaClock className="text-error text-sm sm:text-base" />
                 Operating Hours
-              </h4>
+              </h3>
 
-              <div className="space-y-2">
-                {[
-                  "monday",
-                  "tuesday",
-                  "wednesday",
-                  "thursday",
-                  "friday",
-                  "saturday",
-                  "sunday",
-                ].map((day) => {
+              <div className="space-y-1 sm:space-y-2">
+                {daysOfWeek.map((day) => {
                   const hours = operatingHours[day];
                   const isOpen = hours?.open && hours?.close;
 
                   return (
                     <div
                       key={day}
-                      className="flex justify-between items-center p-2 bg-base-300 rounded"
+                      className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-2 bg-base-300 rounded gap-1 sm:gap-2"
                     >
-                      <span className="capitalize font-medium">{day}</span>
-                      <span className={isOpen ? "" : "text-base-content/50"}>
+                      <span className="capitalize font-medium text-xs sm:text-sm">
+                        {formatDayName(day)}
+                      </span>
+                      <span className={`text-[10px] sm:text-xs ${isOpen ? "" : "text-base-content/50"}`}>
                         {isOpen ? `${hours.open} - ${hours.close}` : "Closed"}
                       </span>
                     </div>
@@ -484,11 +613,11 @@ const BankDetailsModal = ({ bankId, onClose }) => {
 
               {/* Holiday Information */}
               {operatingHours.holidays?.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-base-300">
-                  <p className="text-sm opacity-70 mb-2">Holiday Closures</p>
+                <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-base-300">
+                  <p className="text-[10px] sm:text-xs opacity-70 mb-1 sm:mb-2">Holiday Closures</p>
                   <div className="space-y-1">
                     {operatingHours.holidays.map((holiday, index) => (
-                      <div key={index} className="text-sm">
+                      <div key={index} className="text-[10px] sm:text-xs wrap-break-word">
                         {holiday}
                       </div>
                     ))}
@@ -499,51 +628,59 @@ const BankDetailsModal = ({ bankId, onClose }) => {
           </motion.div>
         )}
 
-        {/* About Tab */}
+        {/* ==================== ABOUT TAB ==================== */}
         {activeTab === "about" && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="space-y-4"
+            className="space-y-3 sm:space-y-4"
           >
             {/* Basic Info */}
-            <div className="bg-base-200 rounded-lg p-4">
-              <h4 className="font-semibold flex items-center gap-2 mb-4">
-                <FaInfoCircle className="text-error" />
+            <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-3 sm:mb-4">
+                <FaInfoCircle className="text-error text-sm sm:text-base" />
                 Bank Information
-              </h4>
+              </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                 <div>
-                  <p className="text-sm opacity-70">Registration Number</p>
-                  <p className="font-medium">{bank.registrationNumber || "N/A"}</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Registration Number</p>
+                  <p className="font-medium text-xs sm:text-sm wrap-break-word">
+                    {bank.registrationNumber || "N/A"}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm opacity-70">Bank Type</p>
-                  <p className="font-medium capitalize">{bank.type || "N/A"}</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Bank Type</p>
+                  <p className="font-medium text-xs sm:text-sm capitalize wrap-break-word">
+                    {bank.type || "N/A"}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm opacity-70">Established</p>
-                  <p className="font-medium">{formatDate(bank.createdAt)}</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Established</p>
+                  <p className="font-medium text-xs sm:text-sm wrap-break-word">
+                    {formatDate(bank.createdAt)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm opacity-70">Last Updated</p>
-                  <p className="font-medium">{formatDate(bank.updatedAt)}</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Last Updated</p>
+                  <p className="font-medium text-xs sm:text-sm wrap-break-word">
+                    {formatDate(bank.updatedAt)}
+                  </p>
                 </div>
               </div>
             </div>
 
             {/* Facilities */}
             {facilities.length > 0 && (
-              <div className="bg-base-200 rounded-lg p-4">
-                <h4 className="font-semibold flex items-center gap-2 mb-4">
-                  <FaTools className="text-error" />
+              <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+                <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-3 sm:mb-4">
+                  <FaTools className="text-error text-sm sm:text-base" />
                   Facilities
-                </h4>
+                </h3>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1 sm:gap-2">
                   {facilities.map((facility, index) => (
-                    <span key={index} className="badge badge-outline badge-lg">
+                    <span key={index} className="badge badge-outline badge-xs sm:badge-sm">
                       {facility}
                     </span>
                   ))}
@@ -552,30 +689,30 @@ const BankDetailsModal = ({ bankId, onClose }) => {
             )}
 
             {/* Statistics */}
-            <div className="bg-base-200 rounded-lg p-4">
-              <h4 className="font-semibold flex items-center gap-2 mb-4">
-                <FaShieldAlt className="text-error" />
+            <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+              <h3 className="font-semibold text-sm sm:text-base flex items-center gap-2 mb-3 sm:mb-4">
+                <FaShieldAlt className="text-error text-sm sm:text-base" />
                 Statistics
-              </h4>
+              </h3>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
                 <div>
-                  <p className="text-sm opacity-70">Total Donations</p>
-                  <p className="font-medium">{stats.totalDonations || 0}</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Total Donations</p>
+                  <p className="font-medium text-xs sm:text-sm">{stats.totalDonations || 0}</p>
                 </div>
                 <div>
-                  <p className="text-sm opacity-70">Total Requests</p>
-                  <p className="font-medium">{stats.totalRequests || 0}</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Total Requests</p>
+                  <p className="font-medium text-xs sm:text-sm">{stats.totalRequests || 0}</p>
                 </div>
                 <div>
-                  <p className="text-sm opacity-70">Response Time</p>
-                  <p className="font-medium">{stats.avgResponseTime || "N/A"}</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Response Time</p>
+                  <p className="font-medium text-xs sm:text-sm">{stats.avgResponseTime || "N/A"}</p>
                 </div>
                 <div>
-                  <p className="text-sm opacity-70">Rating</p>
+                  <p className="text-[10px] sm:text-xs opacity-70">Rating</p>
                   <div className="flex items-center gap-1 mt-1">
-                    {getRatingStars(stats.rating || 0, 14)}
-                    <span className="text-sm ml-1">({stats.rating || 0})</span>
+                    {getRatingStars(stats.rating || 0, 10)}
+                    <span className="text-xs ml-1">({stats.rating || 0})</span>
                   </div>
                 </div>
               </div>
@@ -584,10 +721,14 @@ const BankDetailsModal = ({ bankId, onClose }) => {
         )}
       </div>
 
-      {/* Footer */}
-      <div className="modal-action border-t border-base-300 p-4 bg-base-200/50">
-        <button onClick={onClose} className="btn btn-error text-white ml-auto gap-2">
-          Close
+      {/* ==================== FOOTER ==================== */}
+      <div className="modal-action border-t border-base-300 p-3 sm:p-4 bg-base-200/50">
+        <button
+          onClick={onClose}
+          className="btn btn-error btn-sm sm:btn-md text-white ml-auto gap-1 sm:gap-2"
+        >
+          <FaTimes size={12} className="sm:w-4 sm:h-4" />
+          <span className="text-xs sm:text-sm">Close</span>
         </button>
       </div>
     </div>

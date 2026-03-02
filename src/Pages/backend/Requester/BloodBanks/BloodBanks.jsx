@@ -1,8 +1,8 @@
 // Pages/frontend/Requester/BloodBanks/BloodBanks.jsx
 
 // React
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,15 +44,67 @@ import BankDetailsModal from "./BankDetailsModal/BankDetailsModal";
 // Utils
 import { getBloodTypeColor } from "./utils";
 
+// ==================== CONSTANTS ====================
+
+// Blood types for filter
+const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+// Bank type configuration - BUILD COMPATIBLE (static classes)
+const bankTypeConfig = {
+  government: {
+    color: "badge-primary",
+    icon: FaBuilding,
+    label: "Government",
+    bgGradient: "from-primary to-primary/80",
+  },
+  private: {
+    color: "badge-secondary",
+    icon: FaBuilding,
+    label: "Private",
+    bgGradient: "from-secondary to-secondary/80",
+  },
+  ngo: {
+    color: "badge-success",
+    icon: FaHeartbeat,
+    label: "NGO",
+    bgGradient: "from-success to-success/80",
+  },
+  hospital: {
+    color: "badge-info",
+    icon: FaHospital,
+    label: "Hospital",
+    bgGradient: "from-info to-info/80",
+  },
+};
+
+// Default config for unknown types
+const defaultBankConfig = {
+  color: "badge-ghost",
+  icon: FaHospital,
+  label: "Blood Bank",
+  bgGradient: "from-base-300 to-base-300/80",
+};
+
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  bloodBanks: (filters) => ['bloodBanks', filters],
+  nearbyBanks: (coords, radius) => ['nearbyBanks', coords, radius],
+  bloodTypeSearch: (bloodType, city) => ['bloodTypeSearch', bloodType, city],
+};
+
+// ==================== MAIN COMPONENT ====================
+
 const BloodBanks = () => {
   const { axiosInstance } = useAxiosPublic();
+  const queryClient = useQueryClient();
   const token = localStorage.getItem("auth_token");
 
-  // States
+  // ==================== STATES ====================
+
   const [radius, setRadius] = useState(10000); // 10km default
   const [viewMode, setViewMode] = useState("list"); // 'list', 'nearby', 'search'
   const [searchTerm, setSearchTerm] = useState("");
-  const [nearbyBanks, setNearbyBanks] = useState([]);
   const [selectedType, setSelectedType] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -62,38 +114,12 @@ const BloodBanks = () => {
   const [selectedBloodType, setSelectedBloodType] = useState("");
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-  // Blood types for filter
-  const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+  // ==================== QUERIES ====================
 
-  // Bank type configuration
-  const bankTypeConfig = {
-    government: {
-      color: "badge-primary",
-      icon: FaBuilding,
-      label: "Government",
-      bgColor: "from-primary to-primary/80",
-    },
-    private: {
-      color: "badge-secondary",
-      icon: FaBuilding,
-      label: "Private",
-      bgColor: "from-secondary to-secondary/80",
-    },
-    ngo: {
-      color: "badge-success",
-      icon: FaHeartbeat,
-      label: "NGO",
-      bgColor: "from-success to-success/80",
-    },
-    hospital: {
-      color: "badge-info",
-      icon: FaHospital,
-      label: "Hospital",
-      bgColor: "from-info to-info/80",
-    },
-  };
-
-  // 🔹 Fetch All Blood Banks
+  /**
+   * Query 1: Fetch All Blood Banks
+   * Automatically refetches when filters change
+   */
   const {
     data: bloodBanksData,
     isLoading: loadingBanks,
@@ -101,26 +127,32 @@ const BloodBanks = () => {
     error: banksErrorData,
     refetch: refetchBanks,
   } = useQuery({
-    queryKey: ["public-blood-banks", selectedType, selectedCity],
+    queryKey: queryKeys.bloodBanks({ selectedType, selectedCity }),
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedType) params.append("type", selectedType);
       if (selectedCity) params.append("city", selectedCity);
 
       const res = await axiosInstance.get(`/blood-banks?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes cache
   });
 
-  // 🔹 Search by Blood Type
+  /**
+   * Query 2: Search by Blood Type
+   * Only enabled when we have a selected blood type and we're in search mode
+   */
   const {
     data: searchResults,
     isLoading: searchingBlood,
-    refetch: searchByBlood,
+    error: searchError,
+    refetch: performBloodTypeSearch,
   } = useQuery({
-    queryKey: ["blood-type-search", selectedBloodType, selectedCity],
+    queryKey: queryKeys.bloodTypeSearch(selectedBloodType, selectedCity),
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedBloodType) params.append("bloodType", selectedBloodType);
@@ -128,14 +160,41 @@ const BloodBanks = () => {
 
       const res = await axiosInstance.get(
         `/blood-banks/search/inventory?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       return res.data;
     },
-    enabled: false, // Don't run automatically
+    enabled: false, // Don't run automatically - we'll trigger manually
   });
 
-  // Get user location for nearby search - FIXED VERSION
+  /**
+   * Query 3: Nearby Banks
+   * Only enabled when we have user location
+   */
+  const {
+    data: nearbyData,
+    isLoading: loadingNearby,
+    error: nearbyError,
+  } = useQuery({
+    queryKey: queryKeys.nearbyBanks(userLocation, radius),
+    queryFn: async () => {
+      if (!userLocation) throw new Error("Location not available");
+
+      const { lat, lng } = userLocation;
+      const res = await axiosInstance.get(
+        `/blood-banks/nearby?longitude=${lng}&latitude=${lat}&radius=${radius}`
+      );
+      return res.data;
+    },
+    enabled: !!userLocation && viewMode === "nearby", // Only run when we have location and are in nearby mode
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // ==================== HELPER FUNCTIONS ====================
+
+  /**
+   * Get user location for nearby search
+   */
   const getUserLocation = () => {
     setIsLoadingLocation(true);
     setLocationError("");
@@ -149,16 +208,23 @@ const BloodBanks = () => {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        setUserLocation({ lat: latitude, lng: longitude });
+        const newLocation = { lat: latitude, lng: longitude };
+        setUserLocation(newLocation);
 
         try {
-          const res = await axiosInstance.get(
-            `/blood-banks/nearby?longitude=${longitude}&latitude=${latitude}&radius=${radius}`
-          );
+          // Manually trigger the nearby query
+          const result = await queryClient.fetchQuery({
+            queryKey: queryKeys.nearbyBanks(newLocation, radius),
+            queryFn: async () => {
+              const res = await axiosInstance.get(
+                `/blood-banks/nearby?longitude=${longitude}&latitude=${latitude}&radius=${radius}`
+              );
+              return res.data;
+            },
+          });
 
           // Check if we got any results
-          if (res.data.data && res.data.data.length > 0) {
-            setNearbyBanks(res.data.data);
+          if (result.data && result.data.length > 0) {
             setViewMode("nearby");
             setLocationError(""); // Clear any previous errors
           } else {
@@ -195,7 +261,9 @@ const BloodBanks = () => {
     );
   };
 
-  // Handle blood type search - FIXED VERSION
+  /**
+   * Handle blood type search
+   */
   const handleBloodTypeSearch = async () => {
     if (!selectedBloodType) return;
 
@@ -203,9 +271,9 @@ const BloodBanks = () => {
     setLocationError("");
 
     try {
-      const result = await searchByBlood();
+      const result = await performBloodTypeSearch();
 
-      if (result.data?.data && result.data.data.length > 0) {
+      if (result?.data && result.data.length > 0) {
         setViewMode("search");
         setLocationError("");
       } else {
@@ -221,30 +289,36 @@ const BloodBanks = () => {
     }
   };
 
-  // Reset filters - FIXED VERSION
+  /**
+   * Reset filters
+   */
   const resetFilters = () => {
     setSelectedType("");
     setSelectedCity("");
     setSelectedBloodType("");
     setSearchTerm("");
-    setNearbyBanks([]);
+    setUserLocation(null);
     setViewMode("list");
     setLocationError(""); // Clear any error messages
     setShowFilters(false);
   };
 
-  // Go back to list view - NEW FUNCTION
+  /**
+   * Go back to list view
+   */
   const goToListView = () => {
     setViewMode("list");
     setLocationError(""); // Clear any error messages
   };
 
-  // Filter banks based on search term
-  const getFilteredBanks = () => {
+  /**
+   * Filter banks based on search term
+   */
+  const getFilteredBanks = useMemo(() => {
     let banks = [];
 
     if (viewMode === "nearby") {
-      banks = nearbyBanks;
+      banks = nearbyData?.data || [];
     } else if (viewMode === "search") {
       banks = searchResults?.data || [];
     } else {
@@ -262,16 +336,11 @@ const BloodBanks = () => {
     }
 
     return banks;
-  };
+  }, [viewMode, nearbyData, searchResults, bloodBanksData, searchTerm]);
 
-  const filteredBanks = getFilteredBanks();
-
-  // Get unique cities for filter
-  const uniqueCities = [
-    ...new Set(bloodBanksData?.data?.map((bank) => bank.address?.city).filter(Boolean)),
-  ];
-
-  // Get inventory status
+  /**
+   * Get inventory status
+   */
   const getInventoryStatus = (inventory, bloodType) => {
     if (!inventory) return { status: "No Data", color: "badge-ghost" };
 
@@ -296,7 +365,9 @@ const BloodBanks = () => {
     return { status: "Good", color: "badge-success" };
   };
 
-  // Get rating stars
+  /**
+   * Get rating stars
+   */
   const getRatingStars = (rating = 0) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -314,30 +385,69 @@ const BloodBanks = () => {
     return stars;
   };
 
-  // Close modal helper
+  /**
+   * Get bank config with fallback
+   */
+  const getBankConfig = (type) => {
+    return bankTypeConfig[type] || defaultBankConfig;
+  };
+
+  /**
+   * Close modal helper
+   */
   const closeModal = () => {
     setSelectedBankId(null);
     document.getElementById("bank_details_modal")?.close();
   };
 
+  // ==================== COMPUTED VALUES ====================
+
+  const filteredBanks = getFilteredBanks;
+
+  // Get unique cities for filter
+  const uniqueCities = useMemo(() => {
+    return [
+      ...new Set(bloodBanksData?.data?.map((bank) => bank.address?.city).filter(Boolean)),
+    ];
+  }, [bloodBanksData]);
+
+  // Determine loading state
+  const isLoading = loadingBanks || searchingBlood || loadingNearby || isLoadingLocation;
+
+  // Determine error based on view mode
+  const getCurrentError = () => {
+    if (viewMode === "nearby") return nearbyError;
+    if (viewMode === "search") return searchError;
+    return banksError;
+  };
+
+  const currentError = getCurrentError();
+  const errorData = viewMode === "nearby" ? nearbyError : viewMode === "search" ? searchError : banksErrorData;
+
+  // ==================== RENDER ====================
+
   return (
-    <div className="min-h-screen bg-base-200 p-6">
-      {/* Header Section */}
+    <div className="min-h-screen bg-base-200 p-3 sm:p-4 md:p-6">
+
+      {/* ==================== HEADER SECTION ==================== */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="mb-6"
+        className="mb-4 sm:mb-6"
       >
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        {/* Title and location button - responsive layout */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 sm:gap-4">
+
+          {/* Title */}
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <div className="bg-error/10 p-2 rounded-full">
-                <FiHome className="text-error text-2xl" />
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold flex items-center gap-2 sm:gap-3">
+              <div className="bg-error/10 p-1.5 sm:p-2 rounded-full">
+                <FiHome className="text-error text-lg sm:text-xl md:text-2xl" />
               </div>
               Find Blood Banks
             </h1>
-            <p className="text-base-content/70 mt-1">
+            <p className="text-xs sm:text-sm text-base-content/70 mt-1">
               Search for blood banks, check inventory, and find nearby facilities
             </p>
           </div>
@@ -346,17 +456,17 @@ const BloodBanks = () => {
           <button
             onClick={getUserLocation}
             disabled={isLoadingLocation}
-            className="btn btn-error gap-2"
+            className="btn btn-error btn-sm sm:btn-md gap-1 sm:gap-2 w-full md:w-auto"
           >
             {isLoadingLocation ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
-                Getting Location...
+                <span className="loading loading-spinner loading-xs sm:loading-sm"></span>
+                <span className="text-xs sm:text-sm">Getting Location...</span>
               </>
             ) : (
               <>
-                <FiNavigation size={18} />
-                Find Nearby Banks
+                <FiNavigation size={14} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">Find Nearby Banks</span>
               </>
             )}
           </button>
@@ -364,16 +474,16 @@ const BloodBanks = () => {
 
         {/* Location Error - Shows when nearby search fails */}
         {locationError && (
-          <div className="alert alert-warning mt-4 flex justify-between items-center">
+          <div className="alert alert-warning mt-3 sm:mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
             <div className="flex items-center gap-2">
-              <FiAlertCircle size={20} />
-              <span>{locationError}</span>
+              <FiAlertCircle size={16} className="sm:w-5 sm:h-5 shrink-0" />
+              <span className="text-xs sm:text-sm">{locationError}</span>
             </div>
             {/* Show "View All Banks" button when there's an error */}
             {viewMode !== "list" && (
               <button
                 onClick={goToListView}
-                className="btn btn-sm btn-ghost"
+                className="btn btn-xs sm:btn-sm btn-ghost w-full sm:w-auto"
               >
                 View All Banks
               </button>
@@ -382,24 +492,25 @@ const BloodBanks = () => {
         )}
       </motion.div>
 
-      {/* Search and Filters */}
+      {/* ==================== SEARCH AND FILTERS ==================== */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, delay: 0.1 }}
-        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4 mb-6"
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-3 sm:p-4 mb-4 sm:mb-6"
       >
-        {/* Main Search Row */}
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search Input */}
-          <div className="flex-1">
+        {/* Main Search Row - Responsive layout */}
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
+
+          {/* Search Input - Full width on mobile */}
+          <div className="flex-1 w-full">
             <div className="form-control">
               <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50" />
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm sm:text-base" />
                 <input
                   type="text"
                   placeholder="Search by bank name, city, or state..."
-                  className="input input-bordered w-full pl-10"
+                  className="input input-bordered input-sm sm:input-md w-full pl-8 sm:pl-10 text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -407,10 +518,11 @@ const BloodBanks = () => {
             </div>
           </div>
 
-          {/* Quick Filters */}
-          <div className="flex gap-2">
+          {/* Quick Filters - Responsive wrap */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Blood Type Select */}
             <select
-              className="select select-bordered w-40"
+              className="select select-bordered select-sm sm:select-md w-32 sm:w-40 text-xs sm:text-sm"
               value={selectedBloodType}
               onChange={(e) => setSelectedBloodType(e.target.value)}
             >
@@ -422,36 +534,43 @@ const BloodBanks = () => {
               ))}
             </select>
 
+            {/* Search Button */}
             <button
               onClick={handleBloodTypeSearch}
               disabled={!selectedBloodType || isLoadingLocation}
-              className="btn btn-error gap-2"
+              className="btn btn-error btn-sm sm:btn-md gap-1 sm:gap-2 px-3 sm:px-4"
             >
               {isLoadingLocation && selectedBloodType ? (
-                <span className="loading loading-spinner loading-sm"></span>
+                <span className="loading loading-spinner loading-xs"></span>
               ) : (
-                <FaTint size={16} />
+                <FaTint size={12} className="sm:w-4 sm:h-4" />
               )}
-              Search
+              <span className="text-xs sm:text-sm">Search</span>
             </button>
 
+            {/* Filters Toggle Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`btn btn-outline gap-2 ${showFilters ? "btn-error" : ""}`}
+              className={`btn btn-sm sm:btn-md gap-1 sm:gap-2 px-3 sm:px-4 ${showFilters ? "btn-error" : "btn-outline"}`}
             >
-              <FiFilter size={16} />
-              Filters
+              <FiFilter size={12} className="sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm hidden xs:inline">Filters</span>
             </button>
 
+            {/* Reset Button - Only show when filters are active */}
             {(selectedType || selectedCity || selectedBloodType || searchTerm || viewMode !== "list") && (
-              <button onClick={resetFilters} className="btn btn-ghost btn-square">
-                <FiX size={18} />
+              <button
+                onClick={resetFilters}
+                className="btn btn-ghost btn-sm sm:btn-md btn-square"
+                aria-label="Reset filters"
+              >
+                <FiX size={14} className="sm:w-4 sm:h-4" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Advanced Filters */}
+        {/* Advanced Filters - Collapsible */}
         <AnimatePresence>
           {showFilters && (
             <motion.div
@@ -461,15 +580,18 @@ const BloodBanks = () => {
               transition={{ duration: 0.3 }}
               className="overflow-hidden"
             >
-              <div className="divider my-4"></div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="divider my-3 sm:my-4"></div>
+
+              {/* Filters Grid - Responsive */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+
                 {/* Type Filter */}
                 <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Bank Type</span>
+                  <label className="label py-1">
+                    <span className="label-text text-xs sm:text-sm">Bank Type</span>
                   </label>
                   <select
-                    className="select select-bordered"
+                    className="select select-bordered select-sm sm:select-md text-xs sm:text-sm"
                     value={selectedType}
                     onChange={(e) => setSelectedType(e.target.value)}
                   >
@@ -483,11 +605,11 @@ const BloodBanks = () => {
 
                 {/* City Filter */}
                 <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">City</span>
+                  <label className="label py-1">
+                    <span className="label-text text-xs sm:text-sm">City</span>
                   </label>
                   <select
-                    className="select select-bordered"
+                    className="select select-bordered select-sm sm:select-md text-xs sm:text-sm"
                     value={selectedCity}
                     onChange={(e) => setSelectedCity(e.target.value)}
                   >
@@ -502,9 +624,9 @@ const BloodBanks = () => {
 
                 {/* Radius Filter (for nearby) */}
                 {viewMode === "nearby" && (
-                  <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Search Radius (km)</span>
+                  <div className="form-control sm:col-span-2 lg:col-span-1">
+                    <label className="label py-1">
+                      <span className="label-text text-xs sm:text-sm">Search Radius (km)</span>
                     </label>
                     <input
                       type="range"
@@ -512,10 +634,10 @@ const BloodBanks = () => {
                       max="50"
                       value={radius / 1000}
                       onChange={(e) => setRadius(parseInt(e.target.value) * 1000)}
-                      className="range range-error range-sm"
+                      className="range range-error range-xs sm:range-sm"
                       step="1"
                     />
-                    <div className="flex justify-between text-xs px-2 mt-1">
+                    <div className="flex justify-between text-[10px] sm:text-xs px-1 sm:px-2 mt-1">
                       <span>1km</span>
                       <span>{radius / 1000}km</span>
                       <span>50km</span>
@@ -528,37 +650,39 @@ const BloodBanks = () => {
         </AnimatePresence>
       </motion.div>
 
-      {/* Results Count and View Mode */}
+      {/* ==================== RESULTS COUNT AND VIEW MODE ==================== */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 0.15 }}
-        className="flex justify-between items-center mb-4"
+        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3 sm:mb-4"
       >
-        <div className="text-sm text-base-content/70">
+        {/* Results count text */}
+        <div className="text-xs sm:text-sm text-base-content/70">
           {viewMode === "list" && `Showing ${filteredBanks.length} blood bank${filteredBanks.length !== 1 ? "s" : ""}`}
           {viewMode === "nearby" && `Found ${filteredBanks.length} blood bank${filteredBanks.length !== 1 ? "s" : ""} near you`}
           {viewMode === "search" && selectedBloodType && `Found ${filteredBanks.length} blood bank${filteredBanks.length !== 1 ? "s" : ""} with ${selectedBloodType} blood`}
         </div>
 
+        {/* View mode toggle buttons */}
         <div className="flex gap-1">
           <button
             onClick={goToListView}
-            className={`btn btn-sm ${viewMode === "list" ? "btn-error" : "btn-ghost"}`}
+            className={`btn btn-xs sm:btn-sm ${viewMode === "list" ? "btn-error" : "btn-ghost"}`}
           >
             All Banks
           </button>
           {userLocation && (
             <button
               onClick={() => {
-                if (nearbyBanks.length > 0) {
+                if (nearbyData?.data?.length > 0) {
                   setViewMode("nearby");
                   setLocationError("");
                 } else {
                   getUserLocation(); // Refetch if no nearby banks
                 }
               }}
-              className={`btn btn-sm ${viewMode === "nearby" ? "btn-error" : "btn-ghost"}`}
+              className={`btn btn-xs sm:btn-sm ${viewMode === "nearby" ? "btn-error" : "btn-ghost"}`}
             >
               Nearby
             </button>
@@ -566,16 +690,27 @@ const BloodBanks = () => {
         </div>
       </motion.div>
 
-      {/* Loading State */}
-      {(loadingBanks || searchingBlood || isLoadingLocation) && <BloodLoader />}
+      {/* ==================== LOADING STATE ==================== */}
+      {isLoading && <BloodLoader />}
 
-      {/* Error State for main banks fetch */}
-      {banksError && viewMode === "list" && (
-        <ErrorState error={banksErrorData} onRetry={() => refetchBanks()} />
+      {/* ==================== ERROR STATE ==================== */}
+      {currentError && !isLoading && (
+        <ErrorState
+          error={errorData}
+          onRetry={() => {
+            if (viewMode === "nearby") {
+              queryClient.refetchQueries({ queryKey: queryKeys.nearbyBanks(userLocation, radius) });
+            } else if (viewMode === "search") {
+              performBloodTypeSearch();
+            } else {
+              refetchBanks();
+            }
+          }}
+        />
       )}
 
-      {/* Blood Banks Grid */}
-      {!loadingBanks && !searchingBlood && !isLoadingLocation && (
+      {/* ==================== BLOOD BANKS GRID ==================== */}
+      {!isLoading && !currentError && (
         <motion.div
           initial="hidden"
           animate="visible"
@@ -588,11 +723,12 @@ const BloodBanks = () => {
               },
             },
           }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
         >
           {filteredBanks.length > 0 ? (
             filteredBanks.map((bank) => {
-              const TypeIcon = bankTypeConfig[bank.type]?.icon || FaHospital;
+              const bankConfig = getBankConfig(bank.type);
+              const TypeIcon = bankConfig.icon;
               const inventoryStatus = getInventoryStatus(
                 bank.inventory,
                 selectedBloodType
@@ -609,86 +745,87 @@ const BloodBanks = () => {
                   transition={{ duration: 0.4 }}
                   className="card bg-base-100 shadow-lg hover:shadow-xl transition-all duration-300 border border-base-300 overflow-hidden group"
                 >
-                  {/* Card Header with Type Color */}
-                  <div
-                    className={`h-2 bg-linear-to-r ${bankTypeConfig[bank.type]?.bgColor || "from-base-300 to-base-300/80"
-                      }`}
-                  ></div>
+                  {/* Card Header with Type Color - Static class */}
+                  <div className={`h-2 bg-linear-to-r ${bankConfig.bgGradient}`}></div>
 
-                  <div className="card-body p-5">
+                  <div className="card-body p-4 sm:p-5">
+
                     {/* Bank Name and Type */}
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap justify-between items-start gap-2">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        {/* Bank Avatar */}
                         <div className="avatar">
-                          <div className="w-12 h-12 rounded-full bg-error/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <TypeIcon className="text-error text-xl" />
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-error/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <TypeIcon className="text-error text-base sm:text-xl" />
                           </div>
                         </div>
-                        <div>
-                          <h3 className="font-bold text-lg line-clamp-1">{bank.name}</h3>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span
-                              className={`badge ${bankTypeConfig[bank.type]?.color || "badge-ghost"
-                                } badge-sm gap-1`}
-                            >
-                              <TypeIcon size={10} />
-                              {bankTypeConfig[bank.type]?.label || bank.type}
+
+                        {/* Bank Name and Type Badges */}
+                        <div className="min-w-0">
+                          <h3 className="font-bold text-sm sm:text-base line-clamp-1">{bank.name}</h3>
+                          <div className="flex flex-wrap items-center gap-1 sm:gap-2 mt-1">
+                            {/* Bank Type Badge */}
+                            <span className={`badge ${bankConfig.color} badge-xs sm:badge-sm gap-1`}>
+                              <TypeIcon size={8} />
+                              <span className="text-[10px] sm:text-xs">{bankConfig.label}</span>
                             </span>
+
+                            {/* Verified Badge */}
                             {bank.verification?.isVerified && (
-                              <span className="badge badge-success badge-sm gap-1">
-                                <FiCheckCircle size={10} />
-                                Verified
+                              <span className="badge badge-success badge-xs sm:badge-sm gap-1">
+                                <FiCheckCircle size={8} />
+                                <span className="text-[10px] sm:text-xs">Verified</span>
                               </span>
                             )}
                           </div>
                         </div>
                       </div>
 
-                      {/* Rating */}
-                      <div className="flex items-center gap-1">
+                      {/* Rating - Hidden on very small screens */}
+                      <div className="hidden xs:flex items-center gap-1">
                         {getRatingStars(bank.stats?.rating)}
                       </div>
                     </div>
 
                     {/* Location */}
-                    <div className="flex items-start gap-2 mt-3">
-                      <FiMapPin className="text-base-content/50 mt-1 shrink-0" size={14} />
-                      <div>
-                        <p className="text-sm">
+                    <div className="flex items-start gap-1 sm:gap-2 mt-2 sm:mt-3">
+                      <FiMapPin className="text-base-content/50 mt-1 shrink-0" size={12} />
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm wrap-break-word">
                           {bank.address?.street && `${bank.address.street}, `}
                           {bank.address?.city && `${bank.address.city}, `}
                           {bank.address?.state}
                         </p>
                         {distance && (
-                          <p className="text-xs text-error mt-1">
-                            <FiNavigation className="inline mr-1" size={10} />
-                            {distance} km away
+                          <p className="text-xs text-error mt-1 flex items-center gap-1">
+                            <FiNavigation className="inline" size={10} />
+                            <span>{distance} km away</span>
                           </p>
                         )}
                       </div>
                     </div>
 
-                    {/* Contact Info */}
-                    <div className="flex flex-wrap gap-3 mt-2">
+                    {/* Contact Info - Responsive layout */}
+                    <div className="flex flex-wrap gap-2 sm:gap-3 mt-2">
                       {bank.contact?.phone?.[0] && (
-                        <div className="flex items-center gap-1 text-sm">
-                          <FiPhone className="text-base-content/50" size={12} />
-                          <span>{bank.contact.phone[0]}</span>
+                        <div className="flex items-center gap-1 text-xs sm:text-sm">
+                          <FiPhone className="text-base-content/50" size={10} />
+                          <span className="truncate max-w-24 sm:max-w-32">{bank.contact.phone[0]}</span>
                         </div>
                       )}
                       {bank.contact?.email && (
-                        <div className="flex items-center gap-1 text-sm">
-                          <FiMail className="text-base-content/50" size={12} />
-                          <span className="truncate max-w-32">{bank.contact.email}</span>
+                        <div className="flex items-center gap-1 text-xs sm:text-sm">
+                          <FiMail className="text-base-content/50" size={10} />
+                          <span className="truncate max-w-24 sm:max-w-32">{bank.contact.email}</span>
                         </div>
                       )}
                     </div>
 
                     {/* Operating Hours */}
                     {bank.operatingHours?.monday?.open && (
-                      <div className="flex items-center gap-1 text-sm mt-2">
-                        <FiClock className="text-base-content/50" size={12} />
-                        <span>
+                      <div className="flex items-center gap-1 text-xs sm:text-sm mt-2">
+                        <FiClock className="text-base-content/50" size={10} />
+                        <span className="truncate">
                           Mon-Fri: {bank.operatingHours.monday.open} -{" "}
                           {bank.operatingHours.friday?.close || "17:00"}
                         </span>
@@ -696,12 +833,12 @@ const BloodBanks = () => {
                     )}
 
                     {/* Inventory Status */}
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-base-300">
-                      <div className="flex items-center gap-2">
-                        <FaTint className="text-error" size={16} />
-                        <span className="text-sm font-medium">Blood Inventory:</span>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-base-300">
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <FaTint className="text-error" size={12} />
+                        <span className="text-xs sm:text-sm font-medium">Blood Inventory:</span>
                       </div>
-                      <div className={`badge ${inventoryStatus.color} gap-1`}>
+                      <div className={`badge ${inventoryStatus.color} badge-xs sm:badge-sm gap-1`}>
                         {inventoryStatus.status}
                       </div>
                     </div>
@@ -711,11 +848,11 @@ const BloodBanks = () => {
                       <div className="flex flex-wrap gap-1 mt-2">
                         {bank.inventory
                           .filter((item) => item.units > 0)
-                          .slice(0, 4)
+                          .slice(0, 3)
                           .map((item) => (
                             <span
                               key={item.bloodType}
-                              className="badge badge-outline badge-sm"
+                              className="badge badge-outline badge-xs sm:badge-sm"
                               style={{
                                 borderColor: getBloodTypeColor(item.bloodType),
                                 color: getBloodTypeColor(item.bloodType),
@@ -724,25 +861,25 @@ const BloodBanks = () => {
                               {item.bloodType}: {item.units}
                             </span>
                           ))}
-                        {bank.inventory.filter((item) => item.units > 0).length > 4 && (
-                          <span className="badge badge-ghost badge-sm">
-                            +{bank.inventory.filter((item) => item.units > 0).length - 4} more
+                        {bank.inventory.filter((item) => item.units > 0).length > 3 && (
+                          <span className="badge badge-ghost badge-xs sm:badge-sm">
+                            +{bank.inventory.filter((item) => item.units > 0).length - 3}
                           </span>
                         )}
                       </div>
                     )}
 
                     {/* View Details Button */}
-                    <div className="card-actions justify-end mt-4">
+                    <div className="card-actions justify-end mt-3 sm:mt-4">
                       <button
                         onClick={() => {
                           setSelectedBankId(bank._id);
                           document.getElementById("bank_details_modal")?.showModal();
                         }}
-                        className="btn btn-error btn-sm gap-2"
+                        className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2 w-full xs:w-auto"
                       >
-                        View Details
-                        <FiChevronRight size={16} />
+                        <span>View Details</span>
+                        <FiChevronRight size={12} className="sm:w-4 sm:h-4" />
                       </button>
                     </div>
                   </div>
@@ -758,20 +895,20 @@ const BloodBanks = () => {
               }}
               className="col-span-full"
             >
-              <div className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-12 text-center">
-                <div className="bg-error/10 p-4 rounded-full w-24 h-24 mx-auto mb-4 flex items-center justify-center">
-                  <FiHome className="text-error text-4xl" />
+              <div className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-6 sm:p-8 md:p-12 text-center">
+                <div className="bg-error/10 p-3 sm:p-4 rounded-full w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 mx-auto mb-3 sm:mb-4 flex items-center justify-center">
+                  <FiHome className="text-error text-2xl sm:text-3xl md:text-4xl" />
                 </div>
-                <h3 className="text-xl font-bold mb-2">No Blood Banks Found</h3>
-                <p className="text-base-content/70 mb-6">
+                <h3 className="text-base sm:text-lg md:text-xl font-bold mb-1 sm:mb-2">No Blood Banks Found</h3>
+                <p className="text-xs sm:text-sm text-base-content/70 mb-4 sm:mb-6 max-w-md mx-auto">
                   {viewMode === "nearby"
                     ? "No blood banks found near your location. Try increasing the search radius or viewing all banks."
                     : viewMode === "search"
                       ? `No blood banks found with ${selectedBloodType} blood available. Try another blood type or location.`
                       : "No blood banks match your current filters. Try adjusting your search criteria."}
                 </p>
-                <button onClick={resetFilters} className="btn btn-error gap-2">
-                  <FiFilter size={16} />
+                <button onClick={resetFilters} className="btn btn-error btn-sm sm:btn-md gap-2">
+                  <FiFilter size={14} className="sm:w-4 sm:h-4" />
                   Clear Filters
                 </button>
               </div>
@@ -780,7 +917,7 @@ const BloodBanks = () => {
         </motion.div>
       )}
 
-      {/* Bank Details Modal */}
+      {/* ==================== BANK DETAILS MODAL ==================== */}
       <dialog id="bank_details_modal" className="modal">
         <BankDetailsModal bankId={selectedBankId} onClose={closeModal} />
         <form method="dialog" className="modal-backdrop">

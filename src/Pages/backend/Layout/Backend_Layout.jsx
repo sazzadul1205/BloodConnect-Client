@@ -18,7 +18,6 @@ import {
   FiClipboard,
   FiUser,
   FiActivity,
-
   FiClock,
   FiDroplet,
   FiMapPin,
@@ -26,9 +25,9 @@ import {
   FiList,
   FiBarChart2,
   FiMenu,
-
   FiX,
   FiMail,
+  FiPlus,
 } from "react-icons/fi";
 import { FaHeartbeat } from "react-icons/fa";
 
@@ -38,7 +37,6 @@ import useAuth from "../../../hooks/useAuth";
 // ThemeToggle
 import ThemeToggle from "../../Frontend/layout/ThemeToggle";
 import MessagesDrawer from "./components/MessagesDrawer";
-
 
 // Navigation configurations for different user types
 const navigationConfig = {
@@ -100,6 +98,40 @@ const navigationConfig = {
   ],
 };
 
+// Center dock configuration based on user role
+const centerDockConfig = {
+  donor: {
+    path: "/donor/profile",
+    icon: FiUser,
+    label: "Profile"
+  },
+  hospital: {
+    path: "/hospital/profile",
+    icon: FiUser,
+    label: "Profile"
+  },
+  requester: {
+    path: "/requester/create-request",
+    icon: FiPlus,
+    label: "Create Request"
+  },
+  blood_bank: {
+    path: "/blood_bank/profile",
+    icon: FiUser,
+    label: "Profile"
+  },
+  admin: {
+    path: "/admin/profile",
+    icon: FiUser,
+    label: "Profile"
+  },
+  super_admin: {
+    path: "/super_admin/profile",
+    icon: FiUser,
+    label: "Profile"
+  },
+};
+
 const Backend_Layout = ({ userType }) => {
   const { user, logout } = useAuth();
 
@@ -132,6 +164,9 @@ const Backend_Layout = ({ userType }) => {
         ? item.path.replace(":donorId", currentUserId)
         : item.path,
   }));
+
+  // Get center dock config for current user type
+  const centerDock = centerDockConfig[userType] || centerDockConfig.donor;
 
   // Format user type for display (capitalize and handle special cases)
   const formatUserType = (type) => {
@@ -241,12 +276,12 @@ const Backend_Layout = ({ userType }) => {
             />
           )}
 
-          {/* Menu Drawer Content */}
+          {/* Menu Drawer Content - FIXED VERSION WITH SCROLLABLE CONTENT AND FIXED LOGOUT */}
           <aside
-            className={`fixed inset-y-0 left-0 w-72 bg-base-100 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+            className={`fixed inset-y-0 left-0 w-80 bg-base-100 shadow-2xl z-50 flex flex-col transform transition-transform duration-300 ease-in-out lg:hidden ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
               }`}
           >
-            {/* Drawer Header */}
+            {/* Drawer Header - Fixed at top */}
             <div className="h-16 px-4 border-b border-red-500 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <div className="bg-error/10 p-2 rounded-xl">
@@ -262,8 +297,8 @@ const Backend_Layout = ({ userType }) => {
               </button>
             </div>
 
-            {/* User Info in Drawer */}
-            <div className="p-4 border-b border-base-300">
+            {/* User Info in Drawer - Fixed below header */}
+            <div className="p-4 border-b border-base-300 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="avatar">
                   <div className="w-12 rounded-full bg-error text-white flex items-center justify-center font-semibold text-lg shadow">
@@ -277,41 +312,46 @@ const Backend_Layout = ({ userType }) => {
               </div>
             </div>
 
-            {/* Drawer Navigation Links */}
-            <div className="flex-1 overflow-y-auto p-4">
-              <ul className="space-y-1">
-                {resolvedNavigation.map((item) => (
-                  <li key={item.name}>
-                    <NavLink
-                      to={item.path}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
-                          ? "bg-error text-white shadow-md"
-                          : "hover:bg-base-200 text-base-content"
-                        }`
-                      }
-                    >
-                      <item.icon size={18} />
-                      <span className="font-medium">{item.name}</span>
-                    </NavLink>
-                  </li>
-                ))}
-              </ul>
+            {/* Scrollable Navigation Area */}
+            <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="p-4">
+                <ul className="space-y-1">
+                  {resolvedNavigation.map((item) => (
+                    <li key={item.name}>
+                      <NavLink
+                        to={item.path}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
+                            ? "bg-error text-white shadow-md"
+                            : "hover:bg-base-200 text-base-content"
+                          }`
+                        }
+                      >
+                        <item.icon size={18} />
+                        <span className="font-medium">{item.name}</span>
+                      </NavLink>
+                    </li>
+                  ))}
+                </ul>
 
-              {/* Theme Toggle in Menu Drawer */}
-              <div className="mt-6 pt-4 border-t border-base-300">
-                <div className="flex items-center justify-between px-4 py-2">
-                  <span className="font-medium">Theme</span>
-                  <ThemeToggle />
+                {/* Theme Toggle in Menu Drawer */}
+                <div className="mt-6 pt-4 border-t border-base-300">
+                  <div className="flex items-center justify-between px-4 py-2">
+                    <span className="font-medium">Theme</span>
+                    <ThemeToggle />
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Drawer Footer with Logout */}
-            <div className="p-4 border-t border-red-500">
+            {/* Logout Button - Fixed at bottom */}
+            <div className="p-4 border-t border-red-500 shrink-0 bg-base-100">
               <button
-                onClick={logout}
+                onClick={() => {
+                  logout();
+                  setMobileMenuOpen(false);
+                }}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl hover:bg-error hover:text-white transition-all duration-200"
               >
                 <FiLogOut size={18} />
@@ -396,18 +436,14 @@ const Backend_Layout = ({ userType }) => {
             <span className="dock-label">Messages</span>
           </button>
 
-          {/* Center - Profile */}
+          {/* Center - Customizable by user role */}
           <NavLink
-            to={`/${userType}/profile`}
+            to={centerDock.path}
             className={({ isActive }) => isActive ? 'dock-active' : ''}
-            onClick={() => setActiveMobileTab('profile')}
+            onClick={() => setActiveMobileTab('center')}
           >
-            <div className="avatar">
-              <div className="w-6 rounded-full bg-error text-white flex items-center justify-center font-semibold text-xs">
-                {user?.profile?.fullName?.charAt(0) || "U"}
-              </div>
-            </div>
-            <span className="dock-label">Profile</span>
+            <centerDock.icon className="size-[1.2em]" />
+            <span className="dock-label">{centerDock.label}</span>
           </NavLink>
 
           {/* Right - Menu */}
