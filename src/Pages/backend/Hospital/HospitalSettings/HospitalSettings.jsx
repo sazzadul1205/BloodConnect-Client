@@ -2,8 +2,7 @@
 
 // React
 import React, { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 
@@ -12,7 +11,6 @@ import Swal from "sweetalert2";
 
 // Icons
 import {
-
   FiBell,
   FiShield,
   FiSave,
@@ -22,25 +20,20 @@ import {
   FiSmartphone,
   FiMapPin,
   FiUsers,
-
   FiStar,
   FiClock,
   FiAlertCircle,
   FiCheckCircle,
   FiUser,
-
   FiGlobe,
   FiEdit2,
   FiImage,
   FiRefreshCw,
-
+  FiKey,
 } from "react-icons/fi";
-
 import {
   FaHospital,
-
   FaMapMarkerAlt,
-
   FaAmbulance,
 } from "react-icons/fa";
 
@@ -51,6 +44,15 @@ import useAxiosPublic from "../../../../hooks/useAxiosPublic";
 // Shared
 import ErrorState from "../../../../shared/ErrorState";
 import BloodLoader from "../../../../shared/BloodLoader";
+import ChangePasswordModal from "../../Admin/UsersManagement/ChangePasswordModal/ChangePasswordModal";
+
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  hospitalSettings: (userId) => ['hospital-settings', userId],
+};
+
+// ==================== CONSTANTS ====================
 
 // Default settings configuration
 const defaultSettingsForm = {
@@ -65,14 +67,36 @@ const defaultSettingsForm = {
   },
 };
 
+// Animation variants for staggered animations
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+// ==================== MAIN COMPONENT ====================
+
 const HospitalSettings = () => {
   const { user, logout } = useAuth();
   const { axiosInstance } = useAxiosPublic();
+  const queryClient = useQueryClient();
   const token = localStorage.getItem("auth_token");
   const userId = user?._id || user?.userId || user?.id || user?.uid;
 
-  // State management
+  // ==================== STATE MANAGEMENT ====================
+
   const [activeTab, setActiveTab] = useState("profile");
+
+  // Profile form state
   const [profileForm, setProfileForm] = useState({
     fullName: "",
     bio: "",
@@ -84,17 +108,25 @@ const HospitalSettings = () => {
     },
   });
 
+  // Address form state
   const [addressForm, setAddressForm] = useState({
     street: "",
     city: "",
     state: "",
     zipCode: "",
+    country: "",
     coordinates: [0, 0],
   });
 
+  // Settings form state (notifications & privacy)
   const [settingsForm, setSettingsForm] = useState(defaultSettingsForm);
 
-  // Fetch hospital profile and settings
+  // ==================== TANSTACK QUERIES ====================
+
+  /**
+   * Query: Fetch hospital profile and settings
+   * Combines profile, address, and settings data in one request
+   */
   const {
     data: profileData,
     isLoading,
@@ -102,7 +134,7 @@ const HospitalSettings = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["hospital-settings", userId],
+    queryKey: queryKeys.hospitalSettings(userId),
     enabled: !!userId,
     queryFn: async () => {
       const res = await axiosInstance.get(`/users/profile/${userId}`, {
@@ -110,13 +142,225 @@ const HospitalSettings = () => {
       });
       return res.data?.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Update local state when API data loads
+  // ==================== MUTATIONS ====================
+
+  /**
+   * Mutation 1: Save profile information
+   * Updates hospital name, bio, profile picture, and emergency contact
+   */
+  const profileMutation = useMutation({
+    mutationFn: async (payload) =>
+      axiosInstance.patch(`/users/profile/${userId}`, payload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+    onSuccess: async () => {
+      await Swal.fire({
+        title: "Profile Updated",
+        text: "Your hospital profile has been updated successfully.",
+        icon: "success",
+        timer: 1800,
+        showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+        },
+        buttonsStyling: false,
+      });
+      // Invalidate query to refetch updated data
+      queryClient.invalidateQueries({ queryKey: queryKeys.hospitalSettings(userId) });
+    },
+    onError: async (err) => {
+      await Swal.fire({
+        title: "Update Failed",
+        text: err?.response?.data?.error || "Unable to update profile.",
+        icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
+      });
+    },
+  });
+
+  /**
+   * Mutation 2: Save address information
+   * Updates hospital street address, city, state, zip, and coordinates
+   */
+  const addressMutation = useMutation({
+    mutationFn: async (payload) =>
+      axiosInstance.patch(`/users/address/${userId}`, payload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+    onSuccess: async () => {
+      await Swal.fire({
+        title: "Address Updated",
+        text: "Your hospital address has been updated successfully.",
+        icon: "success",
+        timer: 1800,
+        showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+        },
+        buttonsStyling: false,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.hospitalSettings(userId) });
+    },
+    onError: async (err) => {
+      await Swal.fire({
+        title: "Update Failed",
+        text: err?.response?.data?.error || "Unable to update address.",
+        icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
+      });
+    },
+  });
+
+  /**
+   * Mutation 3: Save notification & privacy settings
+   */
+  const settingsMutation = useMutation({
+    mutationFn: async (payload) =>
+      axiosInstance.patch(`/users/settings/${userId}`, payload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+    onSuccess: async () => {
+      await Swal.fire({
+        title: "Settings Updated",
+        text: "Your notification and privacy settings have been saved successfully.",
+        icon: "success",
+        timer: 1800,
+        showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+        },
+        buttonsStyling: false,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.hospitalSettings(userId) });
+    },
+    onError: async (err) => {
+      await Swal.fire({
+        title: "Update Failed",
+        text: err?.response?.data?.error || "Unable to update settings.",
+        icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
+      });
+    },
+  });
+
+  /**
+   * Mutation 4: Update statistics (manual refresh)
+   */
+  const statsMutation = useMutation({
+    mutationFn: async (payload) =>
+      axiosInstance.patch(`/users/stats/${userId}`, payload, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+    onSuccess: async () => {
+      await Swal.fire({
+        title: "Stats Updated",
+        text: "Your hospital statistics have been updated successfully.",
+        icon: "success",
+        timer: 1800,
+        showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+        },
+        buttonsStyling: false,
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.hospitalSettings(userId) });
+    },
+    onError: async (err) => {
+      await Swal.fire({
+        title: "Update Failed",
+        text: err?.response?.data?.error || "Unable to update stats.",
+        icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
+      });
+    },
+  });
+
+  /**
+   * Mutation 5: Delete account (danger zone)
+   */
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () =>
+      axiosInstance.delete(`/users/${userId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      }),
+    onSuccess: async () => {
+      await Swal.fire({
+        title: "Account Deleted",
+        text: "Your hospital account has been deactivated successfully.",
+        icon: "success",
+        timer: 1800,
+        showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+        },
+        buttonsStyling: false,
+      });
+      await logout();
+    },
+    onError: async (err) => {
+      await Swal.fire({
+        title: "Delete Failed",
+        text: err?.response?.data?.error || "Unable to delete account.",
+        icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
+        customClass: {
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+          confirmButton: "btn btn-sm btn-error text-white",
+        },
+        buttonsStyling: false,
+      });
+    },
+  });
+
+  // ==================== EFFECTS ====================
+
+  /**
+   * Update local state when API data loads
+   * Maps profile data to form states
+   */
   useEffect(() => {
     if (!profileData) return;
 
-    // Profile form
+    // Update profile form
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setProfileForm({
       fullName: profileData?.profile?.fullName || "",
@@ -129,16 +373,17 @@ const HospitalSettings = () => {
       },
     });
 
-    // Address form
+    // Update address form
     setAddressForm({
       street: profileData?.address?.street || "",
       city: profileData?.address?.city || "",
       state: profileData?.address?.state || "",
       zipCode: profileData?.address?.zipCode || "",
+      country: profileData?.address?.country || "",
       coordinates: profileData?.address?.coordinates?.coordinates || [0, 0],
     });
 
-    // Settings form
+    // Update settings form with fallbacks
     const notifications = profileData?.settings?.notifications || {};
     const privacy = profileData?.settings?.privacy || {};
 
@@ -156,172 +401,11 @@ const HospitalSettings = () => {
 
   }, [profileData]);
 
-  // Save profile mutation
-  const profileMutation = useMutation({
-    mutationFn: async (payload) =>
-      axiosInstance.patch(`/users/profile/${userId}`, payload, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
-    onSuccess: async () => {
-      await Swal.fire({
-        title: "Profile Updated",
-        text: "Your hospital profile has been updated successfully.",
-        icon: "success",
-        timer: 1800,
-        showConfirmButton: false,
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-        },
-      });
-      refetch();
-    },
-    onError: async (err) => {
-      await Swal.fire({
-        title: "Update Failed",
-        text: err?.response?.data?.error || "Unable to update profile.",
-        icon: "error",
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-          confirmButton: "btn btn-sm btn-error text-white",
-        },
-        buttonsStyling: false,
-      });
-    },
-  });
+  // ==================== HANDLER FUNCTIONS ====================
 
-  // Save address mutation
-  const addressMutation = useMutation({
-    mutationFn: async (payload) =>
-      axiosInstance.patch(`/users/address/${userId}`, payload, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
-    onSuccess: async () => {
-      await Swal.fire({
-        title: "Address Updated",
-        text: "Your hospital address has been updated successfully.",
-        icon: "success",
-        timer: 1800,
-        showConfirmButton: false,
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-        },
-      });
-      refetch();
-    },
-    onError: async (err) => {
-      await Swal.fire({
-        title: "Update Failed",
-        text: err?.response?.data?.error || "Unable to update address.",
-        icon: "error",
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-          confirmButton: "btn btn-sm btn-error text-white",
-        },
-        buttonsStyling: false,
-      });
-    },
-  });
-
-  // Save notification & privacy settings mutation
-  const settingsMutation = useMutation({
-    mutationFn: async (payload) =>
-      axiosInstance.patch(`/users/settings/${userId}`, payload, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
-    onSuccess: async () => {
-      await Swal.fire({
-        title: "Settings Updated",
-        text: "Your notification and privacy settings have been saved successfully.",
-        icon: "success",
-        timer: 1800,
-        showConfirmButton: false,
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-        },
-      });
-      refetch();
-    },
-    onError: async (err) => {
-      await Swal.fire({
-        title: "Update Failed",
-        text: err?.response?.data?.error || "Unable to update settings.",
-        icon: "error",
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-          confirmButton: "btn btn-sm btn-error text-white",
-        },
-        buttonsStyling: false,
-      });
-    },
-  });
-
-  // Save stats mutation
-  const statsMutation = useMutation({
-    mutationFn: async (payload) =>
-      axiosInstance.patch(`/users/stats/${userId}`, payload, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
-    onSuccess: async () => {
-      await Swal.fire({
-        title: "Stats Updated",
-        text: "Your hospital statistics have been updated successfully.",
-        icon: "success",
-        timer: 1800,
-        showConfirmButton: false,
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-        },
-      });
-      refetch();
-    },
-    onError: async (err) => {
-      await Swal.fire({
-        title: "Update Failed",
-        text: err?.response?.data?.error || "Unable to update stats.",
-        icon: "error",
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-          confirmButton: "btn btn-sm btn-error text-white",
-        },
-        buttonsStyling: false,
-      });
-    },
-  });
-
-  // Delete account mutation
-  const deleteAccountMutation = useMutation({
-    mutationFn: async () =>
-      axiosInstance.delete(`/users/${userId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      }),
-    onSuccess: async () => {
-      await Swal.fire({
-        title: "Account Deleted",
-        text: "Your hospital account has been deactivated successfully.",
-        icon: "success",
-        timer: 1800,
-        showConfirmButton: false,
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-        },
-      });
-      await logout();
-    },
-    onError: async (err) => {
-      await Swal.fire({
-        title: "Delete Failed",
-        text: err?.response?.data?.error || "Unable to delete account.",
-        icon: "error",
-        customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-          confirmButton: "btn btn-sm btn-error text-white",
-        },
-        buttonsStyling: false,
-      });
-    },
-  });
-
-  // Handle profile input changes
+  /**
+   * Handle profile input changes
+   */
   const handleProfileChange = (field, value) => {
     setProfileForm((prev) => ({
       ...prev,
@@ -329,6 +413,9 @@ const HospitalSettings = () => {
     }));
   };
 
+  /**
+   * Handle emergency contact changes (nested object)
+   */
   const handleEmergencyContactChange = (field, value) => {
     setProfileForm((prev) => ({
       ...prev,
@@ -339,7 +426,9 @@ const HospitalSettings = () => {
     }));
   };
 
-  // Handle address input changes
+  /**
+   * Handle address input changes
+   */
   const handleAddressChange = (field, value) => {
     setAddressForm((prev) => ({
       ...prev,
@@ -347,7 +436,9 @@ const HospitalSettings = () => {
     }));
   };
 
-  // Handle coordinates change
+  /**
+   * Handle coordinates change (array of [longitude, latitude])
+   */
   const handleCoordinatesChange = (index, value) => {
     const newCoords = [...addressForm.coordinates];
     newCoords[index] = parseFloat(value) || 0;
@@ -357,7 +448,9 @@ const HospitalSettings = () => {
     }));
   };
 
-  // Handle settings toggle
+  /**
+   * Handle settings toggle switches
+   */
   const handleSettingsToggle = (group, key) => {
     setSettingsForm((prev) => ({
       ...prev,
@@ -368,7 +461,9 @@ const HospitalSettings = () => {
     }));
   };
 
-  // Handle save profile
+  /**
+   * Handle save profile
+   */
   const handleSaveProfile = async () => {
     await profileMutation.mutateAsync({
       fullName: profileForm.fullName,
@@ -378,18 +473,23 @@ const HospitalSettings = () => {
     });
   };
 
-  // Handle save address
+  /**
+   * Handle save address
+   */
   const handleSaveAddress = async () => {
     await addressMutation.mutateAsync({
       street: addressForm.street,
       city: addressForm.city,
       state: addressForm.state,
       zipCode: addressForm.zipCode,
+      country: addressForm.country,
       coordinates: addressForm.coordinates,
     });
   };
 
-  // Handle save settings
+  /**
+   * Handle save settings (notifications & privacy)
+   */
   const handleSaveSettings = async () => {
     await settingsMutation.mutateAsync({
       notifications: settingsForm.notifications,
@@ -397,18 +497,20 @@ const HospitalSettings = () => {
     });
   };
 
-  // Handle update stats
+  /**
+   * Handle update statistics (manual refresh)
+   */
   const handleUpdateStats = async () => {
-    // Example: You could add form fields for stats, but typically these are auto-updated
     await statsMutation.mutateAsync({
-      // These would come from form fields if you add them
       totalDonations: profileData?.stats?.totalDonations || 0,
       totalRequests: profileData?.stats?.totalRequests || 0,
       responseRate: profileData?.stats?.responseRate || 0,
     });
   };
 
-  // Handle delete account with confirmation
+  /**
+   * Handle delete account with confirmation
+   */
   const handleDeleteAccount = async () => {
     const result = await Swal.fire({
       title: "Delete Hospital Account?",
@@ -426,9 +528,13 @@ const HospitalSettings = () => {
       showCancelButton: true,
       confirmButtonText: "Yes, delete hospital account",
       cancelButtonText: "Cancel",
+      background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+      color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
       customClass: {
-        popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-        confirmButton: "btn btn-sm btn-error",
+        popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+        title: "text-lg font-bold text-error",
+        htmlContainer: "text-sm sm:text-base text-base-content/80",
+        confirmButton: "btn btn-sm btn-error text-white",
         cancelButton: "btn btn-sm",
       },
       buttonsStyling: false,
@@ -438,187 +544,208 @@ const HospitalSettings = () => {
     await deleteAccountMutation.mutateAsync();
   };
 
-  // Loading state
+  // ==================== LOADING & ERROR STATES ====================
+
   if (!userId) {
     return (
-      <div className="min-h-screen bg-base-200 p-6">
-        <div className="bg-base-100 rounded-lg border border-base-300 p-8 text-center">
-          <FiAlertCircle className="mx-auto text-4xl text-error mb-3" />
-          <p className="text-base-content/70">Unable to resolve hospital settings.</p>
+      <div className="min-h-screen bg-base-200 p-3 sm:p-4 md:p-6">
+        <div className="bg-base-100 rounded-lg border border-base-300 p-6 sm:p-8 text-center">
+          <FiAlertCircle className="mx-auto text-3xl sm:text-4xl text-error mb-3" />
+          <p className="text-xs sm:text-sm text-base-content/70">Unable to resolve hospital settings.</p>
         </div>
       </div>
     );
   }
 
-  // Loading state
   if (isLoading) return <BloodLoader />;
-
-  // Error state
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
+  /**
+ * Close password modal
+ */
+  const closePasswordModal = () => {
+    document.getElementById("settings_change_password_modal")?.close();
+  };
+
+  // ==================== RENDER ====================
+
+
   return (
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section with Fade In */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={staggerContainer}
+      className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6"
+    >
+
+      {/* ==================== HEADER SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        variants={fadeInUp}
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
       >
+        {/* Title and description */}
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <FaHospital className="text-error" />
             Hospital Settings
-          </h2>
-          <p className="text-base-content/70 text-sm mt-1">
+          </h1>
+          <p className="text-xs sm:text-sm text-base-content/70 mt-1">
             Manage your hospital profile, address, notification preferences, and account settings.
           </p>
         </div>
 
         {/* Hospital Name Badge */}
-        <div className="badge badge-lg badge-outline p-4">
-          <FaHospital className="mr-2 text-error" />
-          {profileData?.profile?.fullName || "Hospital"}
+        <div className="badge badge-lg badge-outline p-3 sm:p-4">
+          <FaHospital className="mr-2 text-error text-xs sm:text-sm" />
+          <span className="text-xs sm:text-sm truncate max-w-40">
+            {profileData?.profile?.fullName || "Hospital"}
+          </span>
         </div>
-      </motion.div>
-
-      {/* Stats Cards with Staggered Fade In */}
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: {
-              staggerChildren: 0.1
-            }
+        {/* Change Password Button */}
+        <button
+          type="button"
+          onClick={() =>
+            document.getElementById("settings_change_password_modal")?.showModal()
           }
-        }}
-        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+          className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2 flex-1 sm:flex-none"
+        >
+          <FiKey size={12} className="sm:w-4 sm:h-4" />
+          <span className="text-xs sm:text-sm">Change Password</span>
+        </button>
+      </motion.div>
+
+      {/* ==================== STATS CARDS ==================== */}
+      <motion.div
+        variants={staggerContainer}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4"
       >
-        {/* Card 1: Total Requests */}
+        {/* Total Requests Card */}
         <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+          variants={fadeInUp}
+          className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4"
         >
-          <div className="stat-figure text-error">
-            <FiCheckCircle size={24} />
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Total Requests</p>
+              <p className="stat-value text-xl sm:text-2xl md:text-3xl font-bold text-error">
+                {profileData?.stats?.totalRequests || 0}
+              </p>
+            </div>
+            <div className="stat-figure bg-error/10 p-2 rounded-full">
+              <FiCheckCircle className="text-error text-lg sm:text-xl" />
+            </div>
           </div>
-          <p className="stat-title">Total Requests</p>
-          <p className="stat-value text-3xl">
-            {profileData?.stats?.totalRequests || 0}
-          </p>
-          <p className="stat-desc">Blood requests made</p>
+          <p className="stat-desc text-xs mt-2">Blood requests made</p>
         </motion.div>
 
-        {/* Card 2: Response Rate */}
+        {/* Response Rate Card */}
         <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+          variants={fadeInUp}
+          className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4"
         >
-          <div className="stat-figure text-info">
-            <FiClock size={24} />
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Response Rate</p>
+              <p className="stat-value text-xl sm:text-2xl md:text-3xl font-bold text-info">
+                {profileData?.stats?.responseRate || 0}%
+              </p>
+            </div>
+            <div className="stat-figure bg-info/10 p-2 rounded-full">
+              <FiClock className="text-info text-lg sm:text-xl" />
+            </div>
           </div>
-          <p className="stat-title">Response Rate</p>
-          <p className="stat-value text-3xl">
-            {profileData?.stats?.responseRate || 0}%
-          </p>
-          <p className="stat-desc">Request fulfillment rate</p>
+          <p className="stat-desc text-xs mt-2">Request fulfillment rate</p>
         </motion.div>
 
-        {/* Card 3: Reputation */}
+        {/* Reputation Card */}
         <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
+          variants={fadeInUp}
+          className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 sm:col-span-2 lg:col-span-1"
         >
-          <div className="stat-figure text-success">
-            <FiStar size={24} />
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Reputation</p>
+              <p className="stat-value text-xl sm:text-2xl md:text-3xl font-bold text-success">
+                {profileData?.stats?.reputation || 0}
+              </p>
+            </div>
+            <div className="stat-figure bg-success/10 p-2 rounded-full">
+              <FiStar className="text-success text-lg sm:text-xl" />
+            </div>
           </div>
-          <p className="stat-title">Reputation</p>
-          <p className="stat-value text-3xl">
-            {profileData?.stats?.reputation || 0}
-          </p>
-          <p className="stat-desc">Trust score</p>
+          <p className="stat-desc text-xs mt-2">Trust score</p>
         </motion.div>
       </motion.div>
 
-      {/* Settings Tabs */}
+      {/* ==================== SETTINGS TABS ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
+        variants={fadeInUp}
         className="bg-base-100 rounded-lg shadow-lg border border-base-300 overflow-hidden"
       >
-        <div className="flex border-b border-base-300">
+        {/* Tab Navigation - Responsive */}
+        <div className="flex flex-wrap border-b border-base-300">
           <button
-            className={`flex-1 py-3 px-4 font-medium text-sm flex items-center justify-center gap-2 ${activeTab === 'profile' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'}`}
+            className={`flex-1 py-2 sm:py-3 px-2 sm:px-4 font-medium text-[10px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 ${activeTab === 'profile' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'
+              }`}
             onClick={() => setActiveTab('profile')}
           >
-            <FiUser size={16} />
-            Profile
+            <FiUser size={12} className="sm:w-4 sm:h-4" />
+            <span>Profile</span>
           </button>
           <button
-            className={`flex-1 py-3 px-4 font-medium text-sm flex items-center justify-center gap-2 ${activeTab === 'address' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'}`}
+            className={`flex-1 py-2 sm:py-3 px-2 sm:px-4 font-medium text-[10px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 ${activeTab === 'address' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'
+              }`}
             onClick={() => setActiveTab('address')}
           >
-            <FiMapPin size={16} />
-            Address
+            <FiMapPin size={12} className="sm:w-4 sm:h-4" />
+            <span>Address</span>
           </button>
           <button
-            className={`flex-1 py-3 px-4 font-medium text-sm flex items-center justify-center gap-2 ${activeTab === 'notifications' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'}`}
+            className={`flex-1 py-2 sm:py-3 px-2 sm:px-4 font-medium text-[10px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 ${activeTab === 'notifications' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'
+              }`}
             onClick={() => setActiveTab('notifications')}
           >
-            <FiBell size={16} />
-            Notifications
+            <FiBell size={12} className="sm:w-4 sm:h-4" />
+            <span>Notifications</span>
           </button>
           <button
-            className={`flex-1 py-3 px-4 font-medium text-sm flex items-center justify-center gap-2 ${activeTab === 'privacy' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'}`}
+            className={`flex-1 py-2 sm:py-3 px-2 sm:px-4 font-medium text-[10px] sm:text-sm flex items-center justify-center gap-1 sm:gap-2 ${activeTab === 'privacy' ? 'bg-error/10 text-error border-b-2 border-error' : 'hover:bg-base-200'
+              }`}
             onClick={() => setActiveTab('privacy')}
           >
-            <FiShield size={16} />
-            Privacy
+            <FiShield size={12} className="sm:w-4 sm:h-4" />
+            <span>Privacy</span>
           </button>
         </div>
 
-        {/* Profile Tab */}
+        {/* ==================== PROFILE TAB ==================== */}
         {activeTab === 'profile' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="p-6 space-y-5"
+            className="p-4 sm:p-6 space-y-4 sm:space-y-5"
           >
-            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
-              <FiUser className="text-error" />
+            <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
+              <FiUser className="text-error text-sm sm:text-base" />
               Hospital Profile Information
-            </h3>
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Full Name */}
+            {/* Responsive grid: 1 column on mobile, 2 on desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+
+              {/* Hospital Name - Full width */}
               <div className="form-control md:col-span-2">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaHospital className="text-error" />
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
+                    <FaHospital className="text-error" size={12} />
                     Hospital Name *
                   </span>
                 </label>
                 <input
                   type="text"
                   placeholder="Enter hospital name"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   value={profileForm.fullName}
                   onChange={(e) => handleProfileChange("fullName", e.target.value)}
                 />
@@ -626,32 +753,31 @@ const HospitalSettings = () => {
 
               {/* Profile Picture URL */}
               <div className="form-control md:col-span-2">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FiImage className="text-error" />
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
+                    <FiImage className="text-error" size={12} />
                     Profile Picture URL
                   </span>
                 </label>
                 <input
                   type="url"
                   placeholder="https://example.com/hospital-logo.jpg"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   value={profileForm.profilePicture}
                   onChange={(e) => handleProfileChange("profilePicture", e.target.value)}
                 />
               </div>
 
-              {/* Bio/Description */}
+              {/* Hospital Description */}
               <div className="form-control md:col-span-2">
-                <label htmlFor="hospital-description">
-                  <span className="label-text flex items-center gap-2">
-                    <FiEdit2 className="text-error" />
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
+                    <FiEdit2 className="text-error" size={12} />
                     Hospital Description
                   </span>
                 </label>
                 <textarea
-                  id="hospital-description"
-                  className="textarea textarea-bordered h-24 w-full"
+                  className="textarea textarea-bordered textarea-sm sm:textarea-md h-20 sm:h-24 w-full"
                   placeholder="Describe your hospital, specialties, facilities..."
                   value={profileForm.bio ?? ""}
                   onChange={(e) => handleProfileChange("bio", e.target.value)}
@@ -660,43 +786,50 @@ const HospitalSettings = () => {
 
               {/* Emergency Contact Section */}
               <div className="md:col-span-2 mt-2">
-                <p className="font-medium mb-3 flex items-center gap-2">
-                  <FaAmbulance className="text-error" />
+                <p className="font-medium text-xs sm:text-sm mb-2 sm:mb-3 flex items-center gap-1 sm:gap-2">
+                  <FaAmbulance className="text-error" size={12} />
                   Emergency Contact Person
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                {/* Responsive grid for emergency contact */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                  {/* Contact Name */}
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Name</span>
+                    <label className="label py-1">
+                      <span className="label-text text-xs">Name</span>
                     </label>
                     <input
                       type="text"
                       placeholder="Contact person name"
-                      className="input input-bordered w-full"
+                      className="input input-bordered input-xs sm:input-sm w-full"
                       value={profileForm.emergencyContact.name}
                       onChange={(e) => handleEmergencyContactChange("name", e.target.value)}
                     />
                   </div>
+
+                  {/* Relation */}
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Relation</span>
+                    <label className="label py-1">
+                      <span className="label-text text-xs">Relation</span>
                     </label>
                     <input
                       type="text"
                       placeholder="e.g., Director, Manager"
-                      className="input input-bordered w-full"
+                      className="input input-bordered input-xs sm:input-sm w-full"
                       value={profileForm.emergencyContact.relation}
                       onChange={(e) => handleEmergencyContactChange("relation", e.target.value)}
                     />
                   </div>
+
+                  {/* Phone */}
                   <div className="form-control">
-                    <label className="label">
-                      <span className="label-text">Phone</span>
+                    <label className="label py-1">
+                      <span className="label-text text-xs">Phone</span>
                     </label>
                     <input
                       type="tel"
                       placeholder="Emergency contact number"
-                      className="input input-bordered w-full"
+                      className="input input-bordered input-xs sm:input-sm w-full"
                       value={profileForm.emergencyContact.phone}
                       onChange={(e) => handleEmergencyContactChange("phone", e.target.value)}
                     />
@@ -706,46 +839,57 @@ const HospitalSettings = () => {
             </div>
 
             {/* Save button for profile */}
-            <div className="pt-4 flex justify-end">
+            <div className="pt-2 sm:pt-4 flex justify-end">
               <button
                 type="button"
                 onClick={handleSaveProfile}
                 disabled={profileMutation.isPending}
-                className="btn btn-error btn-sm gap-2"
+                className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2 w-full sm:w-auto"
               >
-                <FiSave size={16} />
-                {profileMutation.isPending ? "Saving..." : "Save Profile"}
+                {profileMutation.isPending ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span className="text-xs sm:text-sm">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={12} className="sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm">Save Profile</span>
+                  </>
+                )}
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* Address Tab */}
+        {/* ==================== ADDRESS TAB ==================== */}
         {activeTab === 'address' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="p-6 space-y-5"
+            className="p-4 sm:p-6 space-y-4 sm:space-y-5"
           >
-            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
-              <FiMapPin className="text-error" />
+            <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
+              <FiMapPin className="text-error text-sm sm:text-base" />
               Hospital Address & Location
-            </h3>
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Street Address */}
+            {/* Responsive grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+
+              {/* Street Address - Full width */}
               <div className="form-control md:col-span-2">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaMapMarkerAlt className="text-error" />
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
+                    <FaMapMarkerAlt className="text-error" size={12} />
                     Street Address *
                   </span>
                 </label>
                 <input
                   type="text"
                   placeholder="123 Hospital Road"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   value={addressForm.street}
                   onChange={(e) => handleAddressChange("street", e.target.value)}
                 />
@@ -753,13 +897,13 @@ const HospitalSettings = () => {
 
               {/* City */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text">City *</span>
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm">City *</span>
                 </label>
                 <input
                   type="text"
                   placeholder="Mumbai"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   value={addressForm.city}
                   onChange={(e) => handleAddressChange("city", e.target.value)}
                 />
@@ -767,13 +911,13 @@ const HospitalSettings = () => {
 
               {/* State */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text">State *</span>
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm">State *</span>
                 </label>
                 <input
                   type="text"
                   placeholder="Maharashtra"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   value={addressForm.state}
                   onChange={(e) => handleAddressChange("state", e.target.value)}
                 />
@@ -781,27 +925,27 @@ const HospitalSettings = () => {
 
               {/* ZIP Code */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text">ZIP Code *</span>
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm">ZIP Code *</span>
                 </label>
                 <input
                   type="text"
                   placeholder="400001"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   value={addressForm.zipCode}
                   onChange={(e) => handleAddressChange("zipCode", e.target.value)}
                 />
               </div>
 
-              {/* Coordinates */}
+              {/* Country */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Country</span>
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm">Country</span>
                 </label>
                 <input
                   type="text"
                   placeholder="India"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   value={addressForm.country}
                   onChange={(e) => handleAddressChange("country", e.target.value)}
                 />
@@ -809,18 +953,18 @@ const HospitalSettings = () => {
 
               {/* Coordinates Section */}
               <div className="form-control md:col-span-2">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FiGlobe className="text-error" />
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-1 sm:gap-2">
+                    <FiGlobe className="text-error" size={12} />
                     Coordinates (Longitude, Latitude)
                   </span>
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="number"
                     step="any"
                     placeholder="Longitude (e.g., 72.8777)"
-                    className="input input-bordered flex-1"
+                    className="input input-bordered input-sm sm:input-md flex-1 w-full"
                     value={addressForm.coordinates[0]}
                     onChange={(e) => handleCoordinatesChange(0, e.target.value)}
                   />
@@ -828,92 +972,109 @@ const HospitalSettings = () => {
                     type="number"
                     step="any"
                     placeholder="Latitude (e.g., 19.0760)"
-                    className="input input-bordered flex-1"
+                    className="input input-bordered input-sm sm:input-md flex-1 w-full"
                     value={addressForm.coordinates[1]}
                     onChange={(e) => handleCoordinatesChange(1, e.target.value)}
                   />
                 </div>
-                <p className="text-xs text-base-content/50 mt-1">
+                <p className="text-[10px] sm:text-xs text-base-content/50 mt-1">
                   Used for mapping and finding nearby donors
                 </p>
               </div>
             </div>
 
             {/* Save button for address */}
-            <div className="pt-4 flex justify-end">
+            <div className="pt-2 sm:pt-4 flex justify-end">
               <button
                 type="button"
                 onClick={handleSaveAddress}
                 disabled={addressMutation.isPending}
-                className="btn btn-error btn-sm gap-2"
+                className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2 w-full sm:w-auto"
               >
-                <FiSave size={16} />
-                {addressMutation.isPending ? "Saving..." : "Save Address"}
+                {addressMutation.isPending ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span className="text-xs sm:text-sm">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={12} className="sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm">Save Address</span>
+                  </>
+                )}
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* Notifications Tab */}
+        {/* ==================== NOTIFICATIONS TAB ==================== */}
         {activeTab === 'notifications' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="p-6 space-y-5"
+            className="p-4 sm:p-6 space-y-4 sm:space-y-5"
           >
-            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
-              <FiBell className="text-error" />
+            <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
+              <FiBell className="text-error text-sm sm:text-base" />
               Notification Preferences
-            </h3>
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Notification options grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+
               {/* Email Notifications */}
-              <div className="flex items-center justify-between p-4 bg-base-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FiMail className="text-info" size={20} />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-base-200 rounded-lg gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="bg-info/10 p-1.5 sm:p-2 rounded-full">
+                    <FiMail className="text-info text-sm sm:text-base" />
+                  </div>
                   <div>
-                    <p className="font-medium">Email</p>
-                    <p className="text-xs text-base-content/60">Blood request alerts</p>
+                    <p className="font-medium text-xs sm:text-sm">Email</p>
+                    <p className="text-[10px] sm:text-xs text-base-content/60">Blood request alerts</p>
                   </div>
                 </div>
                 <input
                   type="checkbox"
-                  className="toggle toggle-error"
+                  className="toggle toggle-error toggle-sm sm:toggle-md"
                   checked={settingsForm.notifications.email}
                   onChange={() => handleSettingsToggle("notifications", "email")}
                 />
               </div>
 
               {/* SMS Notifications */}
-              <div className="flex items-center justify-between p-4 bg-base-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FiPhone className="text-warning" size={20} />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-base-200 rounded-lg gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="bg-warning/10 p-1.5 sm:p-2 rounded-full">
+                    <FiPhone className="text-warning text-sm sm:text-base" />
+                  </div>
                   <div>
-                    <p className="font-medium">SMS</p>
-                    <p className="text-xs text-base-content/60">Text message alerts</p>
+                    <p className="font-medium text-xs sm:text-sm">SMS</p>
+                    <p className="text-[10px] sm:text-xs text-base-content/60">Text message alerts</p>
                   </div>
                 </div>
                 <input
                   type="checkbox"
-                  className="toggle toggle-warning"
+                  className="toggle toggle-warning toggle-sm sm:toggle-md"
                   checked={settingsForm.notifications.sms}
                   onChange={() => handleSettingsToggle("notifications", "sms")}
                 />
               </div>
 
               {/* Push Notifications */}
-              <div className="flex items-center justify-between p-4 bg-base-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FiSmartphone className="text-success" size={20} />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-base-200 rounded-lg gap-3 sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="bg-success/10 p-1.5 sm:p-2 rounded-full">
+                    <FiSmartphone className="text-success text-sm sm:text-base" />
+                  </div>
                   <div>
-                    <p className="font-medium">Push</p>
-                    <p className="text-xs text-base-content/60">Browser push alerts</p>
+                    <p className="font-medium text-xs sm:text-sm">Push</p>
+                    <p className="text-[10px] sm:text-xs text-base-content/60">Browser push alerts</p>
                   </div>
                 </div>
                 <input
                   type="checkbox"
-                  className="toggle toggle-success"
+                  className="toggle toggle-success toggle-sm sm:toggle-md"
                   checked={settingsForm.notifications.push}
                   onChange={() => handleSettingsToggle("notifications", "push")}
                 />
@@ -921,63 +1082,78 @@ const HospitalSettings = () => {
             </div>
 
             {/* Save button for notifications */}
-            <div className="pt-4 flex justify-end">
+            <div className="pt-2 sm:pt-4 flex justify-end">
               <button
                 type="button"
                 onClick={handleSaveSettings}
                 disabled={settingsMutation.isPending}
-                className="btn btn-error btn-sm gap-2"
+                className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2 w-full sm:w-auto"
               >
-                <FiSave size={16} />
-                {settingsMutation.isPending ? "Saving..." : "Save Notification Settings"}
+                {settingsMutation.isPending ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span className="text-xs sm:text-sm">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={12} className="sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm">Save Notification Settings</span>
+                  </>
+                )}
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* Privacy Tab */}
+        {/* ==================== PRIVACY TAB ==================== */}
         {activeTab === 'privacy' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
-            className="p-6 space-y-5"
+            className="p-4 sm:p-6 space-y-4 sm:space-y-5"
           >
-            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
-              <FiShield className="text-error" />
+            <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
+              <FiShield className="text-error text-sm sm:text-base" />
               Privacy Controls
-            </h3>
+            </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Privacy options grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+
               {/* Show Location */}
-              <div className="flex items-center justify-between p-4 bg-base-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FiMapPin className="text-info" size={20} />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-base-200 rounded-lg gap-3">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="bg-info/10 p-1.5 sm:p-2 rounded-full">
+                    <FiMapPin className="text-info text-sm sm:text-base" />
+                  </div>
                   <div>
-                    <p className="font-medium">Show Location</p>
-                    <p className="text-xs text-base-content/60">Display hospital location on maps</p>
+                    <p className="font-medium text-xs sm:text-sm">Show Location</p>
+                    <p className="text-[10px] sm:text-xs text-base-content/60">Display hospital location on maps</p>
                   </div>
                 </div>
                 <input
                   type="checkbox"
-                  className="toggle toggle-info"
+                  className="toggle toggle-info toggle-sm sm:toggle-md"
                   checked={settingsForm.privacy.showLocation}
                   onChange={() => handleSettingsToggle("privacy", "showLocation")}
                 />
               </div>
 
               {/* Show Contact Details */}
-              <div className="flex items-center justify-between p-4 bg-base-200 rounded-lg md:col-span-2">
-                <div className="flex items-center gap-3">
-                  <FiUsers className="text-warning" size={20} />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-base-200 rounded-lg gap-3 sm:col-span-2 lg:col-span-1">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="bg-warning/10 p-1.5 sm:p-2 rounded-full">
+                    <FiUsers className="text-warning text-sm sm:text-base" />
+                  </div>
                   <div>
-                    <p className="font-medium">Show Contact Details</p>
-                    <p className="text-xs text-base-content/60">Display phone/email to donors and requesters</p>
+                    <p className="font-medium text-xs sm:text-sm">Show Contact Details</p>
+                    <p className="text-[10px] sm:text-xs text-base-content/60">Display phone/email to donors and requesters</p>
                   </div>
                 </div>
                 <input
                   type="checkbox"
-                  className="toggle toggle-warning"
+                  className="toggle toggle-warning toggle-sm sm:toggle-md"
                   checked={settingsForm.privacy.showContact}
                   onChange={() => handleSettingsToggle("privacy", "showContact")}
                 />
@@ -985,85 +1161,104 @@ const HospitalSettings = () => {
             </div>
 
             {/* Save button for privacy */}
-            <div className="pt-4 flex justify-end">
+            <div className="pt-2 sm:pt-4 flex justify-end">
               <button
                 type="button"
                 onClick={handleSaveSettings}
                 disabled={settingsMutation.isPending}
-                className="btn btn-error btn-sm gap-2"
+                className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2 w-full sm:w-auto"
               >
-                <FiSave size={16} />
-                {settingsMutation.isPending ? "Saving..." : "Save Privacy Settings"}
+                {settingsMutation.isPending ? (
+                  <>
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span className="text-xs sm:text-sm">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={12} className="sm:w-4 sm:h-4" />
+                    <span className="text-xs sm:text-sm">Save Privacy Settings</span>
+                  </>
+                )}
               </button>
             </div>
           </motion.div>
         )}
       </motion.div>
 
-      {/* Stats Update Section */}
+      {/* ==================== STATS UPDATE SECTION ==================== */}
       <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-6 space-y-5"
+        variants={fadeInUp}
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4 sm:p-6 space-y-4 sm:space-y-5"
       >
-        <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
-          <FiClock className="text-error" />
+        <h2 className="text-base sm:text-lg font-semibold flex items-center gap-2 pb-2 border-b border-base-300">
+          <FiClock className="text-error text-sm sm:text-base" />
           Hospital Statistics
-        </h3>
+        </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-base-200 rounded-lg p-4">
-            <p className="text-sm opacity-70">Total Blood Requests</p>
-            <p className="text-2xl font-bold">{profileData?.stats?.totalRequests || 0}</p>
+        {/* Stats grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+          <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+            <p className="text-[10px] sm:text-xs opacity-70">Total Blood Requests</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold">{profileData?.stats?.totalRequests || 0}</p>
           </div>
-          <div className="bg-base-200 rounded-lg p-4">
-            <p className="text-sm opacity-70">Response Rate</p>
-            <p className="text-2xl font-bold">{profileData?.stats?.responseRate || 0}%</p>
+          <div className="bg-base-200 rounded-lg p-3 sm:p-4">
+            <p className="text-[10px] sm:text-xs opacity-70">Response Rate</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold">{profileData?.stats?.responseRate || 0}%</p>
           </div>
-          <div className="bg-base-200 rounded-lg p-4">
-            <p className="text-sm opacity-70">Reputation Score</p>
-            <p className="text-2xl font-bold">{profileData?.stats?.reputation || 0}</p>
+          <div className="bg-base-200 rounded-lg p-3 sm:p-4 sm:col-span-2 md:col-span-1">
+            <p className="text-[10px] sm:text-xs opacity-70">Reputation Score</p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold">{profileData?.stats?.reputation || 0}</p>
           </div>
         </div>
 
-        <div className="alert alert-info bg-info/10 border-info/20 text-sm">
-          <FiAlertCircle className="text-info" />
-          <span>Statistics are automatically updated based on your hospital's activity.</span>
+        {/* Info alert */}
+        <div className="alert alert-info bg-info/10 border-info/20 flex-col sm:flex-row gap-2 p-3 sm:p-4">
+          <FiAlertCircle className="text-info text-sm sm:text-base shrink-0" />
+          <span className="text-[10px] sm:text-xs text-center sm:text-left">
+            Statistics are automatically updated based on your hospital's activity.
+          </span>
         </div>
 
-        {/* Manual update button (optional) */}
+        {/* Manual update button */}
         <div className="pt-2 flex justify-end">
           <button
             type="button"
             onClick={handleUpdateStats}
             disabled={statsMutation.isPending}
-            className="btn btn-outline btn-info btn-sm gap-2"
+            className="btn btn-outline btn-info btn-xs sm:btn-sm gap-1 sm:gap-2 w-full sm:w-auto"
           >
-            <FiRefreshCw size={16} />
-            {statsMutation.isPending ? "Updating..." : "Refresh Statistics"}
+            {statsMutation.isPending ? (
+              <>
+                <span className="loading loading-spinner loading-xs"></span>
+                <span className="text-xs sm:text-sm">Updating...</span>
+              </>
+            ) : (
+              <>
+                <FiRefreshCw size={12} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">Refresh Statistics</span>
+              </>
+            )}
           </button>
         </div>
       </motion.section>
 
-      {/* Danger Zone Section */}
+      {/* ==================== DANGER ZONE SECTION ==================== */}
       <motion.section
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.25 }}
-        className="bg-base-100 rounded-lg shadow-lg border border-error/30 p-6"
+        variants={fadeInUp}
+        className="bg-base-100 rounded-lg shadow-lg border border-error/30 p-4 sm:p-6"
       >
-        <h3 className="text-lg font-semibold text-error flex items-center gap-2 pb-2 border-b border-error/20">
-          <FiTrash2 />
+        <h2 className="text-base sm:text-lg font-semibold text-error flex items-center gap-2 pb-2 border-b border-error/20">
+          <FiTrash2 className="text-sm sm:text-base" />
           Danger Zone
-        </h3>
+        </h2>
 
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mt-3">
-          <div className="flex items-start gap-3">
-            <FiAlertCircle className="text-error shrink-0 mt-1" size={20} />
+        {/* Delete account section */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mt-3">
+          <div className="flex items-start gap-2 sm:gap-3 flex-1">
+            <FiAlertCircle className="text-error shrink-0 mt-1 sm:w-5 sm:h-5" size={16} />
             <div>
-              <p className="font-medium">Delete Hospital Account</p>
-              <p className="text-sm text-base-content/70">
+              <p className="font-medium text-xs sm:text-sm">Delete Hospital Account</p>
+              <p className="text-[10px] sm:text-xs text-base-content/70">
                 This will permanently delete your hospital profile, cancel all active blood requests,
                 and remove staff associations. This action cannot be undone.
               </p>
@@ -1072,30 +1267,53 @@ const HospitalSettings = () => {
 
           <button
             type="button"
-            className="btn btn-outline btn-error gap-2 shrink-0"
+            className="btn btn-outline btn-error btn-xs sm:btn-sm gap-1 sm:gap-2 w-full lg:w-auto"
             onClick={handleDeleteAccount}
             disabled={deleteAccountMutation.isPending}
           >
-            <FiTrash2 size={16} />
-            {deleteAccountMutation.isPending ? "Deleting..." : "Delete Hospital Account"}
+            {deleteAccountMutation.isPending ? (
+              <>
+                <span className="loading loading-spinner loading-xs"></span>
+                <span className="text-xs sm:text-sm">Deleting...</span>
+              </>
+            ) : (
+              <>
+                <FiTrash2 size={12} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">Delete Hospital Account</span>
+              </>
+            )}
           </button>
         </div>
       </motion.section>
 
-      {/* Mobile Save Button - FAB for small screens */}
+      {/* ==================== MOBILE SAVE BUTTON ==================== */}
+      {/* FAB for mobile when any mutation is in progress */}
       {(profileMutation.isPending || addressMutation.isPending || settingsMutation.isPending || statsMutation.isPending) && (
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3 }}
-          className="lg:hidden fixed bottom-6 right-6 z-10"
+          className="lg:hidden fixed bottom-4 right-4 z-10"
         >
-          <div className="btn btn-error btn-circle shadow-xl w-14 h-14">
-            <span className="loading loading-spinner loading-md"></span>
+          <div className="btn btn-error btn-circle shadow-xl w-12 h-12 sm:w-14 sm:h-14">
+            <span className="loading loading-spinner loading-sm sm:loading-md"></span>
           </div>
         </motion.div>
       )}
-    </div>
+
+      {/* ==================== CHANGE PASSWORD MODAL ==================== */}
+      <dialog id="settings_change_password_modal" className="modal">
+        <ChangePasswordModal
+          userId={userId}
+          userName={user?.profile?.fullName || "My Account"}
+          onClose={closePasswordModal}
+          refreshUsers={() => refetch()}
+        />
+        <form method="dialog" className="modal-backdrop" onClick={closePasswordModal}>
+          <button>close</button>
+        </form>
+      </dialog>
+    </motion.div>
   );
 };
 

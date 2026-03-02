@@ -24,15 +24,12 @@ import {
   FaTint,
   FaHospital,
   FaCheckCircle,
-
   FaUser,
   FaShieldAlt,
   FaFlask,
   FaClipboardList,
   FaHourglassHalf,
-
   FaAmbulance,
-
   FaBuilding,
   FaPhoneAlt,
   FaEnvelope,
@@ -50,12 +47,14 @@ import { getId } from "../../../../utils/id";
 import { safeString } from "../../../../utils/string";
 import { getUserId } from "../../../../utils/user";
 
+// ==================== CONSTANTS ====================
+
 // Format date for display
 const formatDate = (value) => {
   return formatAppDate(value);
 };
 
-// Status colors mapping
+// Status colors mapping for badges
 const statusColors = {
   pending: "warning",
   matched: "info",
@@ -64,18 +63,31 @@ const statusColors = {
   expired: "neutral",
 };
 
-// Urgency colors mapping
+// Urgency colors mapping for badges
 const urgencyColors = {
   emergency: "error",
   urgent: "warning",
   normal: "info",
 };
 
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  hospitalDashboard: (hospitalId) => ['hospital-dashboard', hospitalId],
+  hospitalRequests: (hospitalName) => ['hospital-requests', hospitalName],
+  hospitalPending: (hospitalName) => ['hospital-pending', hospitalName],
+  hospitalFulfilled: (hospitalName) => ['hospital-fulfilled', hospitalName],
+  upcomingEvents: (city) => ['upcoming-events', city],
+  eligibleDonors: (city) => ['eligible-donors', city],
+};
+
+// ==================== MAIN COMPONENT ====================
+
 const HospitalDashboard = () => {
   const { user, loading: authLoading } = useAuth();
   const { axiosInstance } = useAxiosPublic();
 
-  // Get hospital ID from user object
+  // Get hospital ID from user object using utility function
   const hospitalId = useMemo(
     () => getUserId(user),
     [user],
@@ -86,6 +98,11 @@ const HospitalDashboard = () => {
     return user?.profile?.fullName || user?.hospitalName || "";
   }, [user]);
 
+  /**
+   * TanStack Query: Fetch all hospital dashboard data
+   * Combines multiple API calls into a single query
+   * Only runs when authentication is complete and hospitalId exists
+   */
   const {
     data: dashboardData,
     isLoading,
@@ -94,13 +111,19 @@ const HospitalDashboard = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["hospital-dashboard", hospitalId, hospitalName],
+    // Query key includes hospitalId for cache management
+    queryKey: queryKeys.hospitalDashboard(hospitalId),
+
+    // Only run query when we have hospitalId and auth is loaded
     enabled: !authLoading && !!hospitalId,
+
+    // Query function that fetches all dashboard data
     queryFn: async () => {
       if (!hospitalId) {
         throw new Error("Hospital ID not found. Please log in again.");
       }
 
+      // Get auth token for API requests
       const token = localStorage.getItem("auth_token");
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
 
@@ -108,6 +131,7 @@ const HospitalDashboard = () => {
       const profileRes = await axiosInstance.get(`/users/profile/${hospitalId}`, { headers });
       const hospital = profileRes?.data?.data || null;
 
+      // Get city for location-based queries
       const city = hospital?.address?.city || "";
 
       // Fetch all blood requests for this hospital
@@ -128,7 +152,7 @@ const HospitalDashboard = () => {
         { headers }
       );
 
-      // Fetch upcoming events in the city
+      // Fetch upcoming events in the city (non-critical, won't fail dashboard if error)
       let events = [];
       if (city) {
         try {
@@ -138,8 +162,8 @@ const HospitalDashboard = () => {
           );
           events = eventsRes?.data?.data || [];
         } catch (err) {
+          // Log error but don't fail the dashboard
           console.error("Error fetching events:", err);
-          // Non-critical error, don't fail the whole dashboard
         }
       }
 
@@ -152,10 +176,11 @@ const HospitalDashboard = () => {
         const donorsRes = await axiosInstance.get(donorQuery, { headers });
         donors = (donorsRes?.data?.data || []).slice(0, 5);
       } catch (err) {
+        // Log error but don't fail the dashboard
         console.error("Error fetching donors:", err);
-        // Non-critical error, don't fail the whole dashboard
       }
 
+      // Return combined dashboard data
       return {
         hospital,
         allRequests: requestsRes?.data?.data || [],
@@ -165,31 +190,51 @@ const HospitalDashboard = () => {
         recentDonors: donors,
       };
     },
+
+    // Data is considered fresh for 5 minutes (reduces unnecessary refetch)
+    staleTime: 5 * 60 * 1000,
+
+    // Cache data for 10 minutes
+    gcTime: 10 * 60 * 1000,
   });
 
+  // ==================== MEMOIZED VALUES ====================
+
+  /**
+   * Extract data from dashboard query result
+   * Using useMemo to prevent unnecessary recalculations
+   */
   const hospital = dashboardData?.hospital || null;
+
   const allRequests = useMemo(
     () => dashboardData?.allRequests ?? [],
     [dashboardData?.allRequests],
   );
+
   const pendingRequests = useMemo(
     () => dashboardData?.pendingRequests ?? [],
     [dashboardData?.pendingRequests],
   );
+
   const fulfilledRequests = useMemo(
     () => dashboardData?.fulfilledRequests ?? [],
     [dashboardData?.fulfilledRequests],
   );
+
   const upcomingEvents = useMemo(
     () => dashboardData?.upcomingEvents ?? [],
     [dashboardData?.upcomingEvents],
   );
+
   const recentDonors = useMemo(
     () => dashboardData?.recentDonors ?? [],
     [dashboardData?.recentDonors],
   );
 
-  // Calculate request statistics
+  /**
+   * Calculate comprehensive request statistics
+   * Memoized to update only when requests data changes
+   */
   const requestStats = useMemo(() => {
     const total = allRequests.length;
     const pending = pendingRequests.length;
@@ -211,7 +256,7 @@ const HospitalDashboard = () => {
       sum + (r?.requestDetails?.units || 0), 0
     );
 
-    // Calculate response rate (from matches)
+    // Calculate response rate from donor matches
     let totalResponses = 0;
     let acceptedResponses = 0;
 
@@ -233,7 +278,7 @@ const HospitalDashboard = () => {
       matched,
       fulfilled,
       cancelled,
-      activeRequests: pending + matched,
+      activeRequests: pending + matched, // Requests still needing attention
       emergency,
       urgent,
       normal,
@@ -246,7 +291,9 @@ const HospitalDashboard = () => {
     };
   }, [allRequests, pendingRequests, fulfilledRequests]);
 
-  // Get recent 5 requests
+  /**
+   * Get recent 5 requests sorted by creation date
+   */
   const recentRequests = useMemo(() => {
     return [...allRequests]
       .sort((a, b) => {
@@ -257,7 +304,9 @@ const HospitalDashboard = () => {
       .slice(0, 5);
   }, [allRequests]);
 
-  // Get emergency requests
+  /**
+   * Get emergency requests that need immediate attention
+   */
   const emergencyRequests = useMemo(() => {
     return allRequests
       .filter(r =>
@@ -269,23 +318,28 @@ const HospitalDashboard = () => {
       .slice(0, 3);
   }, [allRequests]);
 
-  // Loading state
-  if (isLoading || authLoading) return <BloodLoader />;
+  // ==================== LOADING & ERROR STATES ====================
 
-  // Error state
+  if (isLoading || authLoading) return <BloodLoader />;
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
+
+  // ==================== RENDER ====================
 
   return (
     <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section */}
+
+      {/* ==================== HEADER SECTION ==================== */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Title and welcome message */}
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <FaHospital className="text-error" />
             Hospital Dashboard
           </h2>
           <p className="text-sm text-base-content/70 mt-1">
-            Welcome back, <span className="font-semibold text-error">{hospital?.profile?.fullName || user?.profile?.fullName || "Hospital"}</span>!
+            Welcome back, <span className="font-semibold text-error">
+              {hospital?.profile?.fullName || user?.profile?.fullName || "Hospital"}
+            </span>!
             Manage blood requests and monitor activity.
           </p>
         </div>
@@ -304,7 +358,7 @@ const HospitalDashboard = () => {
             className="btn btn-sm btn-outline gap-2"
           >
             <FaUser />
-            Settings
+            <span className="hidden md:block" >Settings</span>
           </Link>
           <button
             type="button"
@@ -313,33 +367,39 @@ const HospitalDashboard = () => {
             disabled={isFetching}
           >
             <FiRefreshCw className={isFetching ? "animate-spin" : ""} />
-            {isFetching ? "Refreshing..." : "Refresh"}
+            <span className="hidden md:block" >{isFetching ? "Refreshing..." : "Refresh"}</span>
           </button>
         </div>
       </div>
 
-      {/* Hospital Info Card */}
+      {/* ==================== HOSPITAL INFO CARD ==================== */}
       {hospital && (
         <div className="bg-base-100 border border-base-300 rounded-lg p-5">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
+            {/* Hospital Avatar */}
             <div className="bg-error/10 p-4 rounded-full">
               <FaHospital className="text-error" size={32} />
             </div>
+
+            {/* Hospital Details */}
             <div className="flex-1">
               <h3 className="text-xl font-bold">{hospital?.profile?.fullName || "Hospital"}</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 text-sm">
+                {/* Phone */}
                 {hospital?.phone && (
                   <div className="flex items-center gap-2">
                     <FaPhoneAlt className="text-error/70" size={14} />
                     <span>{hospital.phone}</span>
                   </div>
                 )}
+                {/* Email */}
                 {hospital?.email && (
                   <div className="flex items-center gap-2">
                     <FaEnvelope className="text-error/70" size={14} />
                     <span>{hospital.email}</span>
                   </div>
                 )}
+                {/* Location */}
                 {hospital?.address?.city && (
                   <div className="flex items-center gap-2">
                     <FiMapPin className="text-error/70" size={14} />
@@ -348,6 +408,8 @@ const HospitalDashboard = () => {
                 )}
               </div>
             </div>
+
+            {/* Verified Badge */}
             <div className="badge badge-lg badge-error p-3">
               Verified Hospital
             </div>
@@ -355,7 +417,7 @@ const HospitalDashboard = () => {
         </div>
       )}
 
-      {/* Emergency Requests Alert */}
+      {/* ==================== EMERGENCY REQUESTS ALERT ==================== */}
       {requestStats.emergency > 0 && (
         <div className="alert alert-error bg-error/10 border-error/20">
           <FaAmbulance className="text-error animate-pulse" size={20} />
@@ -369,14 +431,16 @@ const HospitalDashboard = () => {
         </div>
       )}
 
-      {/* Stats Cards Grid */}
+      {/* ==================== STATS CARDS GRID ==================== */}
+      {/* Animated cards showing key metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
         {/* Total Requests Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -397,7 +461,7 @@ const HospitalDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -418,7 +482,7 @@ const HospitalDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -439,7 +503,7 @@ const HospitalDashboard = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
+          className="stat bg-base-100 border border-base-300 rounded-lg p-5 hover:shadow-lg transition-shadow"
         >
           <div className="flex items-center justify-between">
             <div>
@@ -456,10 +520,12 @@ const HospitalDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Charts and Analytics Section */}
+      {/* ==================== CHARTS AND ANALYTICS SECTION ==================== */}
+      {/* Only show if there are requests */}
       {allRequests.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {/* Requests by Status */}
+
+          {/* Requests by Status Chart */}
           <div className="bg-base-100 border border-base-300 rounded-lg p-5">
             <h3 className="font-semibold flex items-center gap-2 mb-4">
               <FaFlask className="text-error" />
@@ -492,7 +558,7 @@ const HospitalDashboard = () => {
             </div>
           </div>
 
-          {/* Requests by Urgency */}
+          {/* Requests by Urgency Chart */}
           <div className="bg-base-100 border border-base-300 rounded-lg p-5">
             <h3 className="font-semibold flex items-center gap-2 mb-4">
               <FaAmbulance className="text-error" />
@@ -526,9 +592,11 @@ const HospitalDashboard = () => {
         </div>
       )}
 
-      {/* Three Column Grid */}
+      {/* ==================== THREE COLUMN GRID ==================== */}
+      {/* Recent Requests, Upcoming Events, Eligible Donors */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Recent Blood Requests */}
+
+        {/* Recent Blood Requests Column */}
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
           <div className="p-4 border-b border-base-300 font-semibold flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -589,7 +657,7 @@ const HospitalDashboard = () => {
           </div>
         </div>
 
-        {/* Upcoming Events */}
+        {/* Upcoming Events Column */}
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
           <div className="p-4 border-b border-base-300 font-semibold flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -657,7 +725,7 @@ const HospitalDashboard = () => {
           </div>
         </div>
 
-        {/* Recent Eligible Donors */}
+        {/* Recent Eligible Donors Column */}
         <div className="bg-base-100 border border-base-300 rounded-lg overflow-hidden">
           <div className="p-4 border-b border-base-300 font-semibold flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -731,7 +799,8 @@ const HospitalDashboard = () => {
         </div>
       </div>
 
-      {/* Emergency Requests Section */}
+      {/* ==================== EMERGENCY REQUESTS SECTION ==================== */}
+      {/* Show emergency requests that need immediate attention */}
       {emergencyRequests.length > 0 && (
         <div className="bg-base-100 border border-error/30 rounded-lg p-5">
           <h3 className="font-semibold flex items-center gap-2 mb-4 text-error">
@@ -768,7 +837,7 @@ const HospitalDashboard = () => {
         </div>
       )}
 
-      {/* Quick Actions Grid */}
+      {/* ==================== QUICK ACTIONS GRID ==================== */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Link
           to="/hospital/my-requests"
@@ -811,7 +880,7 @@ const HospitalDashboard = () => {
         </Link>
       </div>
 
-      {/* Footer Note */}
+      {/* ==================== FOOTER NOTE ==================== */}
       <div className="text-xs text-center text-base-content/60 flex items-center justify-center gap-2">
         <FaShieldAlt className="inline" />
         Your hospital data is updated in real-time. Last updated: {formatAppTime(new Date())}
