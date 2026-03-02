@@ -2,7 +2,7 @@
 
 // React
 import React, { useState, useMemo } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -45,6 +45,8 @@ import {
   formatDateInputValue,
 } from "../../../../utils/dateFormat";
 
+// ==================== CONSTANTS ====================
+
 // Format date for display
 const formatDateTime = (value) => {
   return formatAppDateTime(value);
@@ -66,6 +68,7 @@ const componentTypes = [
   { id: "cryoprecipitate", label: "Cryo", icon: FaSyringe },
 ];
 
+// Default inventory structure for new banks
 const defaultInventory = bloodTypes.map((bloodType) => ({
   bloodType,
   units: 0,
@@ -79,7 +82,7 @@ const defaultInventory = bloodTypes.map((bloodType) => ({
   },
 }));
 
-// Status configuration
+// Status configuration for inventory levels
 const statusConfig = {
   CRITICAL: {
     label: "Critical",
@@ -123,25 +126,62 @@ const calculateInventoryStatus = (units, threshold) => {
   return "GOOD";
 };
 
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  myBloodBank: (userId) => ['my-blood-bank-inventory', userId],
+  bloodBankInventory: (bankId) => ['blood-bank-inventory', bankId],
+};
+
+// ==================== ANIMATION VARIANTS ====================
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+// ==================== MAIN COMPONENT ====================
+
 const InventoryManagement = () => {
   const { user, loading: authLoading } = useAuth();
   const { axiosInstance } = useAxiosPublic();
+  const queryClient = useQueryClient();
   const token = localStorage.getItem("auth_token");
   const isBloodBankUser = user?.role === "blood_bank";
 
+  // Get user ID from auth
   const userId = useMemo(
     () => user?.userId || user?._id || user?.id || user?.uid,
     [user],
   );
 
   // Auth headers for API requests
-  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+  const authHeaders = useMemo(
+    () => (token ? { Authorization: `Bearer ${token}` } : {}),
+    [token],
+  );
 
+  // ==================== QUERIES ====================
+
+  /**
+   * Query 1: Fetch blood bank data for current staff user
+   * Only runs for blood bank staff users
+   */
   const {
     data: myBankData,
     isLoading: myBankLoading,
   } = useQuery({
-    queryKey: ["my-blood-bank-inventory", userId, user?.role],
+    queryKey: queryKeys.myBloodBank(userId),
     enabled: !authLoading && isBloodBankUser && !!userId,
     queryFn: async () => {
       const res = await axiosInstance.get("/blood-banks/staff/me", {
@@ -150,9 +190,13 @@ const InventoryManagement = () => {
       return res.data?.data || null;
     },
     retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Resolve bank ID. For blood bank staff, never fall back to userId.
+  /**
+   * Resolve blood bank ID from multiple possible sources
+   * For blood bank staff, never fall back to userId (it causes invalid /blood-banks/:id calls)
+   */
   const bankId = useMemo(() => {
     const profileBankId =
       user?.bankId ||
@@ -168,7 +212,8 @@ const InventoryManagement = () => {
     return profileBankId || userId || null;
   }, [isBloodBankUser, myBankData, user, userId]);
 
-  // State management
+  // ==================== STATE MANAGEMENT ====================
+
   const [draftInventory, setDraftInventory] = useState(null);
   const [editingType, setEditingType] = useState(null);
   const [bulkEditMode, setBulkEditMode] = useState(false);
@@ -188,7 +233,12 @@ const InventoryManagement = () => {
     },
   });
 
-  // Fetch blood bank details
+  // ==================== TANSTACK QUERIES ====================
+
+  /**
+   * Query 2: Fetch blood bank inventory details
+   * Main query for inventory data
+   */
   const {
     data: bankData,
     isLoading,
@@ -196,7 +246,7 @@ const InventoryManagement = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["blood-bank-inventory", bankId],
+    queryKey: queryKeys.bloodBankInventory(bankId),
     enabled: !authLoading && !!bankId && (!isBloodBankUser || !myBankLoading),
     queryFn: async () => {
       if (!bankId) {
@@ -209,9 +259,15 @@ const InventoryManagement = () => {
 
       return res.data?.data;
     },
+    staleTime: 2 * 60 * 1000, // 2 minutes - inventory changes frequently
+    gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Update inventory mutation
+  // ==================== MUTATIONS ====================
+
+  /**
+   * Mutation: Update inventory (single or bulk)
+   */
   const updateInventoryMutation = useMutation({
     mutationFn: async (payload) => {
       const response = await axiosInstance.patch(
@@ -228,11 +284,17 @@ const InventoryManagement = () => {
         icon: "success",
         timer: 2000,
         showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
         },
+        buttonsStyling: false,
       });
-      refetch();
+
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: queryKeys.bloodBankInventory(bankId) });
+
       setEditingType(null);
       setBulkEditMode(false);
       setDraftInventory(null);
@@ -242,8 +304,10 @@ const InventoryManagement = () => {
         title: "Update Failed",
         text: err?.response?.data?.error || "Failed to update inventory.",
         icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           confirmButton: "btn btn-sm btn-error text-white",
         },
         buttonsStyling: false,
@@ -251,13 +315,24 @@ const InventoryManagement = () => {
     },
   });
 
+  // ==================== COMPUTED VALUES ====================
+
+  /**
+   * Base inventory from API or default
+   */
   const baseInventory = useMemo(
     () => (bankData?.inventory?.length ? bankData.inventory : defaultInventory),
     [bankData],
   );
+
+  /**
+   * Current inventory (draft or base)
+   */
   const inventory = draftInventory ?? baseInventory;
 
-  // Process inventory with status
+  /**
+   * Process inventory with status calculations
+   */
   const processedInventory = useMemo(() => {
     return inventory.map(item => ({
       ...item,
@@ -266,7 +341,9 @@ const InventoryManagement = () => {
     }));
   }, [inventory]);
 
-  // Filter inventory
+  /**
+   * Filter inventory by status and search term
+   */
   const filteredInventory = useMemo(() => {
     let filtered = processedInventory;
 
@@ -286,7 +363,9 @@ const InventoryManagement = () => {
     return filtered;
   }, [processedInventory, filterStatus, searchTerm]);
 
-  // Calculate statistics
+  /**
+   * Calculate inventory statistics
+   */
   const inventoryStats = useMemo(() => {
     const totalUnits = inventory.reduce((sum, item) => sum + (item.units || 0), 0);
     const criticalCount = processedInventory.filter(i => i.status === "CRITICAL").length;
@@ -306,7 +385,11 @@ const InventoryManagement = () => {
     };
   }, [inventory, processedInventory]);
 
-  // Handle edit single blood type
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Handle edit single blood type
+   */
   const handleEdit = (bloodType) => {
     const item = inventory.find(i => i.bloodType === bloodType);
     if (item) {
@@ -325,7 +408,9 @@ const InventoryManagement = () => {
     }
   };
 
-  // Handle save single update
+  /**
+   * Handle save single update
+   */
   const handleSaveSingle = async () => {
     await updateInventoryMutation.mutateAsync({
       bloodType: editForm.bloodType,
@@ -335,7 +420,9 @@ const InventoryManagement = () => {
     });
   };
 
-  // Handle bulk update
+  /**
+   * Handle bulk update
+   */
   const handleBulkUpdate = async () => {
     const updates = inventory.map(item => ({
       bloodType: item.bloodType,
@@ -347,7 +434,9 @@ const InventoryManagement = () => {
     await updateInventoryMutation.mutateAsync({ updates });
   };
 
-  // Handle reset to thresholds
+  /**
+   * Handle reset to thresholds (set all to 2x threshold)
+   */
   const handleResetToThreshold = () => {
     setDraftInventory((prev) => {
       const source = prev ?? baseInventory;
@@ -358,7 +447,9 @@ const InventoryManagement = () => {
     });
   };
 
-  // Handle set all to zero
+  /**
+   * Handle set all to zero with confirmation
+   */
   const handleSetAllZero = () => {
     Swal.fire({
       title: "Reset All Inventory?",
@@ -369,8 +460,12 @@ const InventoryManagement = () => {
       cancelButtonColor: "#6b7280",
       confirmButtonText: "Yes, reset all",
       cancelButtonText: "Cancel",
+      background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+      color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
       customClass: {
-        popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+        popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+        title: "text-lg font-bold text-error",
+        htmlContainer: "text-sm sm:text-base text-base-content/80",
         confirmButton: "btn btn-sm btn-error text-white",
         cancelButton: "btn btn-sm",
       },
@@ -394,7 +489,9 @@ const InventoryManagement = () => {
     });
   };
 
-  // Handle input change for edit form
+  /**
+   * Handle input change for edit form
+   */
   const handleEditFormChange = (field, value) => {
     setEditForm(prev => ({
       ...prev,
@@ -402,6 +499,9 @@ const InventoryManagement = () => {
     }));
   };
 
+  /**
+   * Handle component change in edit form
+   */
   const handleComponentChange = (component, value) => {
     setEditForm(prev => ({
       ...prev,
@@ -412,7 +512,9 @@ const InventoryManagement = () => {
     }));
   };
 
-  // Handle inventory change in bulk mode
+  /**
+   * Handle inventory change in bulk mode
+   */
   const handleBulkChange = (bloodType, field, value) => {
     setDraftInventory((prev) => {
       const source = prev ?? baseInventory;
@@ -436,7 +538,9 @@ const InventoryManagement = () => {
     });
   };
 
-  // Handle export inventory
+  /**
+   * Handle export inventory to CSV
+   */
   const handleExport = () => {
     const exportData = processedInventory.map(item => ({
       BloodType: item.bloodType,
@@ -455,8 +559,10 @@ const InventoryManagement = () => {
         title: "No Data",
         text: "There is no inventory data to export.",
         icon: "info",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           confirmButton: "btn btn-sm btn-info text-white",
         },
         buttonsStyling: false,
@@ -478,8 +584,7 @@ const InventoryManagement = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  // Loading state
-  if (isLoading || authLoading || myBankLoading) return <BloodLoader />;
+  // ==================== ERROR HANDLING ====================
 
   const profileErrorStatus = error?.response?.status;
   const profileErrorMessage = error?.response?.data?.error || error?.message || "";
@@ -494,88 +599,107 @@ const InventoryManagement = () => {
   const showNoProfileState =
     (!bankId && !authLoading && !myBankLoading) || isProfileMissingError;
 
-  // No profile state
+  // ==================== LOADING STATES ====================
+
+  if (isLoading || authLoading || myBankLoading) return <BloodLoader />;
+
+  // ==================== NO PROFILE STATE ====================
+
   if (showNoProfileState) {
     return (
-      <div className="space-y-6 min-h-screen bg-base-200 p-6">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={staggerContainer}
+        className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6"
+      >
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
+          variants={fadeInUp}
           className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
         >
           <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
               <FaTint className="text-error" />
               Inventory Management
-            </h2>
-            <p className="text-sm text-base-content/70 mt-1">
+            </h1>
+            <p className="text-xs sm:text-sm text-base-content/70 mt-1">
               Manage blood inventory levels and components.
             </p>
           </div>
         </motion.div>
 
+        {/* No Profile Alert */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="alert bg-base-100 border border-error/20 shadow-sm items-start"
+          variants={fadeInUp}
+          className="alert bg-base-100 border border-error/20 shadow-sm items-start p-3 sm:p-4"
         >
-          <FaExclamationTriangle className="text-error mt-0.5" />
+          <FaExclamationTriangle className="text-error mt-0.5 text-lg sm:text-xl shrink-0" />
           <div>
-            <h3 className="font-semibold text-error">Blood Bank Profile Not Found</h3>
-            <p className="text-sm text-base-content/70 mt-1">
+            <h3 className="font-semibold text-error text-sm sm:text-base">Blood Bank Profile Not Found</h3>
+            <p className="text-xs sm:text-sm text-base-content/70 mt-1">
               No blood bank profile data is available for this account. Please contact an admin to create or link your blood bank profile.
             </p>
           </div>
         </motion.div>
-      </div>
+      </motion.div>
     );
   }
 
-  // Error state
+  // ==================== ERROR STATE ====================
+
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
+  // ==================== RENDER ====================
+
   return (
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={staggerContainer}
+      className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6"
+    >
+
+      {/* ==================== HEADER SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        variants={fadeInUp}
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
+        {/* Title and description */}
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <FaTint className="text-error" />
             Inventory Management
-          </h2>
-          <p className="text-sm text-base-content/70 mt-1">
+          </h1>
+          <p className="text-xs sm:text-sm text-base-content/70 mt-1">
             {bankData?.name} • Manage blood inventory levels and components
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Export Button */}
           <button
             type="button"
             onClick={handleExport}
-            className="btn btn-sm btn-outline gap-2"
+            className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2"
           >
-            <FiDownload size={16} />
-            Export
+            <FiDownload size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">Export</span>
           </button>
+
+          {/* Refresh Button */}
           <button
             type="button"
-            onClick={() => {
-              refetch();
-            }}
-            className="btn btn-sm btn-outline gap-2"
+            onClick={() => refetch()}
+            className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2"
             disabled={isLoading}
           >
-            <FiRefreshCw className={isLoading ? "animate-spin" : ""} />
-            Refresh
+            <FiRefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            <span className="text-xs sm:text-sm">Refresh</span>
           </button>
+
+          {/* Edit Mode Toggle */}
           {!bulkEditMode ? (
             <button
               onClick={() => {
@@ -587,10 +711,10 @@ const InventoryManagement = () => {
                   })),
                 );
               }}
-              className="btn btn-sm btn-error gap-2"
+              className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2"
             >
-              <FiEdit2 size={16} />
-              Bulk Edit
+              <FiEdit2 size={12} className="sm:w-4 sm:h-4" />
+              <span className="text-xs sm:text-sm">Bulk Edit</span>
             </button>
           ) : (
             <button
@@ -599,81 +723,102 @@ const InventoryManagement = () => {
                 setEditingType(null);
                 setDraftInventory(null);
               }}
-              className="btn btn-sm btn-ghost gap-2"
+              className="btn btn-ghost btn-xs sm:btn-sm gap-1 sm:gap-2"
             >
-              Cancel Bulk Edit
+              <span className="text-xs sm:text-sm">Cancel Bulk Edit</span>
             </button>
           )}
         </div>
       </motion.div>
 
-      {/* Stats Cards */}
+      {/* ==================== STATS CARDS ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+        variants={staggerContainer}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4"
       >
-        <div className="stat bg-base-100 rounded-lg shadow-lg p-4">
-          <div className="stat-figure text-error">
-            <FaTint size={24} />
+        {/* Total Units Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Total Units</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-error">{inventoryStats.totalUnits}</p>
+            </div>
+            <div className="stat-figure bg-error/10 p-2 rounded-full">
+              <FaTint className="text-error text-sm sm:text-base" />
+            </div>
           </div>
-          <div className="stat-title">Total Units</div>
-          <div className="stat-value text-2xl">{inventoryStats.totalUnits}</div>
-          <div className="stat-desc">Across all blood types</div>
-        </div>
+          <p className="stat-desc text-xs mt-2">Across all blood types</p>
+        </motion.div>
 
-        <div className="stat bg-base-100 rounded-lg shadow-lg p-4">
-          <div className="stat-figure text-error">
-            <FiPackage size={24} />
+        {/* Active Types Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Active Types</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-info">{inventoryStats.activeTypes}/8</p>
+            </div>
+            <div className="stat-figure bg-info/10 p-2 rounded-full">
+              <FiPackage className="text-info text-sm sm:text-base" />
+            </div>
           </div>
-          <div className="stat-title">Active Types</div>
-          <div className="stat-value text-2xl">{inventoryStats.activeTypes}/8</div>
-          <div className="stat-desc">Blood types in stock</div>
-        </div>
+          <p className="stat-desc text-xs mt-2">Blood types in stock</p>
+        </motion.div>
 
-        <div className="stat bg-base-100 rounded-lg shadow-lg p-4">
-          <div className="stat-figure text-error">
-            <FaExclamationTriangle size={24} />
+        {/* Critical Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Critical</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-error">{inventoryStats.criticalCount}</p>
+            </div>
+            <div className="stat-figure bg-error/10 p-2 rounded-full">
+              <FaExclamationTriangle className="text-error text-sm sm:text-base" />
+            </div>
           </div>
-          <div className="stat-title">Critical</div>
-          <div className="stat-value text-2xl text-error">{inventoryStats.criticalCount}</div>
-          <div className="stat-desc">Need immediate attention</div>
-        </div>
+          <p className="stat-desc text-xs mt-2">Need immediate attention</p>
+        </motion.div>
 
-        <div className="stat bg-base-100 rounded-lg shadow-lg p-4">
-          <div className="stat-figure text-warning">
-            <FiAlertCircle size={24} />
+        {/* Low Stock Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Low Stock</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-warning">{inventoryStats.lowCount}</p>
+            </div>
+            <div className="stat-figure bg-warning/10 p-2 rounded-full">
+              <FiAlertCircle className="text-warning text-sm sm:text-base" />
+            </div>
           </div>
-          <div className="stat-title">Low Stock</div>
-          <div className="stat-value text-2xl text-warning">{inventoryStats.lowCount}</div>
-          <div className="stat-desc">Below 2x threshold</div>
-        </div>
+          <p className="stat-desc text-xs mt-2">Below 2x threshold</p>
+        </motion.div>
 
-        <div className="stat bg-base-100 rounded-lg shadow-lg p-4">
-          <div className="stat-figure text-success">
-            <FaCheckCircleSolid size={24} />
+        {/* Good Stock Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Good Stock</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-success">{inventoryStats.goodCount}</p>
+            </div>
+            <div className="stat-figure bg-success/10 p-2 rounded-full">
+              <FaCheckCircleSolid className="text-success text-sm sm:text-base" />
+            </div>
           </div>
-          <div className="stat-title">Good Stock</div>
-          <div className="stat-value text-2xl text-success">{inventoryStats.goodCount}</div>
-          <div className="stat-desc">Healthy inventory</div>
-        </div>
+          <p className="stat-desc text-xs mt-2">Healthy inventory</p>
+        </motion.div>
       </motion.div>
 
-      {/* Filters and Quick Actions */}
+      {/* ==================== FILTERS AND QUICK ACTIONS ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4"
+        variants={fadeInUp}
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-3 sm:p-4"
       >
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
+          {/* Search Input */}
           <div className="flex-1">
             <input
               type="text"
               placeholder="Search by blood type..."
-              className="input input-bordered w-full"
+              className="input input-bordered input-sm sm:input-md w-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -682,7 +827,7 @@ const InventoryManagement = () => {
           {/* Status Filter */}
           <div className="w-full lg:w-48">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
             >
@@ -694,58 +839,58 @@ const InventoryManagement = () => {
             </select>
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions for Bulk Edit Mode */}
           {bulkEditMode && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 onClick={handleResetToThreshold}
-                className="btn btn-sm btn-outline btn-info"
+                className="btn btn-outline btn-info btn-xs sm:btn-sm"
               >
                 Set to 2x Threshold
               </button>
               <button
                 onClick={handleSetAllZero}
-                className="btn btn-sm btn-outline btn-error"
+                className="btn btn-outline btn-error btn-xs sm:btn-sm"
               >
                 Reset All
               </button>
               <button
                 onClick={handleBulkUpdate}
                 disabled={updateInventoryMutation.isPending}
-                className="btn btn-sm btn-error gap-2"
+                className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2"
               >
                 {updateInventoryMutation.isPending ? (
-                  <span className="loading loading-spinner loading-sm"></span>
+                  <span className="loading loading-spinner loading-xs"></span>
                 ) : (
-                  <FiSave size={16} />
+                  <FiSave size={12} className="sm:w-4 sm:h-4" />
                 )}
-                Save All Changes
+                <span className="text-xs sm:text-sm">Save All Changes</span>
               </button>
             </div>
           )}
         </div>
       </motion.div>
 
-      {/* Inventory Table */}
+      {/* ==================== INVENTORY TABLE ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        variants={fadeInUp}
         className="bg-base-100 rounded-lg shadow-lg border border-base-300 overflow-hidden"
       >
         <div className="overflow-x-auto">
-          <table className="table table-zebra w-full">
+          <table className="table table-xs sm:table-sm md:table-md w-full">
+            {/* Table Header */}
             <thead>
               <tr className="bg-base-200">
-                <th>Blood Type</th>
-                <th>Status</th>
-                <th>Units</th>
-                <th>Threshold</th>
-                <th colSpan={4} className="text-center">Components</th>
-                <th>Last Updated</th>
-                <th className="text-center">Actions</th>
+                <th className="text-xs sm:text-sm">Blood Type</th>
+                <th className="text-xs sm:text-sm">Status</th>
+                <th className="text-xs sm:text-sm">Units</th>
+                <th className="text-xs sm:text-sm">Threshold</th>
+                <th colSpan={4} className="text-center text-xs sm:text-sm">Components</th>
+                <th className="text-xs sm:text-sm">Last Updated</th>
+                <th className="text-center text-xs sm:text-sm">Actions</th>
               </tr>
-              <tr className="bg-base-200 text-xs">
+              {/* Component Sub-header */}
+              <tr className="bg-base-200 text-[10px] sm:text-xs">
                 <th></th>
                 <th></th>
                 <th></th>
@@ -758,6 +903,8 @@ const InventoryManagement = () => {
                 <th></th>
               </tr>
             </thead>
+
+            {/* Table Body */}
             <tbody>
               {filteredInventory.map((item) => {
                 const StatusIcon = item.statusConfig.icon;
@@ -771,13 +918,14 @@ const InventoryManagement = () => {
                     transition={{ duration: 0.3 }}
                     className={item.status === "CRITICAL" ? "bg-error/5" : ""}
                   >
-                    <td className="font-bold text-lg">{item.bloodType}</td>
+                    {/* Blood Type */}
+                    <td className="font-bold text-sm sm:text-base">{item.bloodType}</td>
 
-                    {/* Status */}
+                    {/* Status Badge */}
                     <td>
-                      <span className={`badge badge-${item.statusConfig.color} gap-1`}>
-                        <StatusIcon size={12} />
-                        {item.statusConfig.label}
+                      <span className={`badge badge-${item.statusConfig.color} badge-xs sm:badge-sm gap-1`}>
+                        <StatusIcon size={8} className="sm:w-3 sm:h-3" />
+                        <span className="text-[10px] sm:text-xs">{item.statusConfig.label}</span>
                       </span>
                     </td>
 
@@ -787,7 +935,7 @@ const InventoryManagement = () => {
                         <input
                           type="number"
                           min="0"
-                          className="input input-bordered input-sm w-20"
+                          className="input input-bordered input-xs sm:input-sm w-16 sm:w-20"
                           value={bulkEditMode ? item.units : editForm.units}
                           onChange={(e) => {
                             if (bulkEditMode) {
@@ -798,7 +946,7 @@ const InventoryManagement = () => {
                           }}
                         />
                       ) : (
-                        <span className={`font-bold ${item.units <= item.threshold ? 'text-error' : ''}`}>
+                        <span className={`font-bold text-xs sm:text-sm ${item.units <= item.threshold ? 'text-error' : ''}`}>
                           {item.units}
                         </span>
                       )}
@@ -810,7 +958,7 @@ const InventoryManagement = () => {
                         <input
                           type="number"
                           min="0"
-                          className="input input-bordered input-sm w-20"
+                          className="input input-bordered input-xs sm:input-sm w-16 sm:w-20"
                           value={bulkEditMode ? item.threshold : editForm.threshold}
                           onChange={(e) => {
                             if (bulkEditMode) {
@@ -821,7 +969,7 @@ const InventoryManagement = () => {
                           }}
                         />
                       ) : (
-                        <span>{item.threshold}</span>
+                        <span className="text-xs sm:text-sm">{item.threshold}</span>
                       )}
                     </td>
 
@@ -832,7 +980,7 @@ const InventoryManagement = () => {
                           <input
                             type="number"
                             min="0"
-                            className="input input-bordered input-sm w-16"
+                            className="input input-bordered input-xs sm:input-sm w-14 sm:w-16"
                             value={bulkEditMode ? (item.components?.[comp.id] || 0) : (editForm.components?.[comp.id] || 0)}
                             onChange={(e) => {
                               if (bulkEditMode) {
@@ -843,7 +991,7 @@ const InventoryManagement = () => {
                             }}
                           />
                         ) : (
-                          <span className="text-sm">
+                          <span className="text-[10px] sm:text-xs">
                             {item.components?.[comp.id] || 0}
                           </span>
                         )}
@@ -852,8 +1000,8 @@ const InventoryManagement = () => {
 
                     {/* Last Updated */}
                     <td>
-                      <div className="flex items-center gap-1 text-xs">
-                        <FiClock size={12} className="opacity-50" />
+                      <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                        <FiClock size={8} className="sm:w-3 sm:h-3 opacity-50" />
                         <span title={formatDateTime(item.lastUpdated)}>
                           {formatTimeOnly(item.lastUpdated)}
                         </span>
@@ -869,7 +1017,7 @@ const InventoryManagement = () => {
                             className="btn btn-ghost btn-xs btn-square tooltip"
                             data-tip="Edit"
                           >
-                            <FiEdit2 size={14} />
+                            <FiEdit2 size={10} className="sm:w-4 sm:h-4" />
                           </button>
                         )}
                         {isEditing && (
@@ -882,15 +1030,15 @@ const InventoryManagement = () => {
                               {updateInventoryMutation.isPending ? (
                                 <span className="loading loading-spinner loading-xs"></span>
                               ) : (
-                                <FiSave size={12} />
+                                <FiSave size={10} />
                               )}
-                              Save
+                              <span className="text-[10px]">Save</span>
                             </button>
                             <button
                               onClick={() => setEditingType(null)}
                               className="btn btn-xs btn-ghost"
                             >
-                              Cancel
+                              <span className="text-[10px]">Cancel</span>
                             </button>
                           </>
                         )}
@@ -904,18 +1052,16 @@ const InventoryManagement = () => {
         </div>
       </motion.div>
 
-      {/* Low Inventory Alert */}
+      {/* ==================== LOW INVENTORY ALERT ==================== */}
       {inventoryStats.criticalCount > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
-          className="alert alert-error bg-error/10 border-error/20"
+          variants={fadeInUp}
+          className="alert alert-error bg-error/10 border-error/20 flex-col sm:flex-row gap-3 p-3 sm:p-4"
         >
-          <FaExclamationTriangle className="text-error" size={20} />
+          <FaExclamationTriangle className="text-error text-lg sm:text-xl shrink-0" />
           <div className="flex-1">
-            <span className="font-semibold">Critical Inventory Alert!</span>
-            <p className="text-sm">
+            <span className="font-semibold text-error text-xs sm:text-sm">Critical Inventory Alert!</span>
+            <p className="text-[10px] sm:text-xs">
               {inventoryStats.criticalCount} blood type(s) have critically low inventory.
               {filteredInventory
                 .filter(i => i.status === "CRITICAL")
@@ -925,25 +1071,23 @@ const InventoryManagement = () => {
           </div>
           <button
             onClick={() => setFilterStatus("CRITICAL")}
-            className="btn btn-sm btn-error"
+            className="btn btn-error btn-xs sm:btn-sm w-full sm:w-auto"
           >
             View Critical
           </button>
         </motion.div>
       )}
 
-      {/* Inventory Tips */}
+      {/* ==================== INVENTORY TIPS ==================== */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-        className="bg-info/10 border border-info/20 rounded-lg p-4 text-sm"
+        variants={fadeInUp}
+        className="bg-info/10 border border-info/20 rounded-lg p-3 sm:p-4 text-xs sm:text-sm"
       >
-        <div className="flex items-start gap-3">
-          <FiAlertCircle className="text-info text-xl shrink-0 mt-0.5" />
+        <div className="flex flex-col xs:flex-row items-start gap-2 sm:gap-3">
+          <FiAlertCircle className="text-info text-lg sm:text-xl shrink-0" />
           <div>
-            <p className="font-semibold text-info mb-1">Inventory Management Tips:</p>
-            <ul className="list-disc list-inside text-base-content/70 space-y-1">
+            <p className="font-semibold text-info mb-1 text-xs sm:text-sm">Inventory Management Tips:</p>
+            <ul className="list-disc list-inside text-[10px] sm:text-xs text-base-content/70 space-y-1">
               <li><span className="font-medium text-error">Critical</span> - Below threshold, needs immediate restocking</li>
               <li><span className="font-medium text-warning">Low</span> - Between threshold and 2x threshold, plan restocking soon</li>
               <li><span className="font-medium text-info">Adequate</span> - Between 2x and 3x threshold, comfortable levels</li>
@@ -953,7 +1097,7 @@ const InventoryManagement = () => {
           </div>
         </div>
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 

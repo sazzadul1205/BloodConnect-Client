@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Sweet Alert
 import Swal from "sweetalert2";
@@ -14,7 +14,6 @@ import Swal from "sweetalert2";
 import {
   FaTimes,
   FaUserCheck,
-  FaCheckCircle,
   FaExclamationTriangle,
   FaSearch,
   FaUserPlus,
@@ -27,17 +26,80 @@ import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 import BloodLoader from "../../../../../shared/BloodLoader";
 import { formatAppTime } from "../../../../../utils/dateFormat";
 
+// ==================== ANIMATION VARIANTS ====================
+
+const modalVariants = {
+  hidden: { opacity: 0, scale: 0.95, y: 20 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: "easeOut"
+    }
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.95,
+    y: 20,
+    transition: {
+      duration: 0.2,
+      ease: "easeIn"
+    }
+  }
+};
+
+const donorItemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: (custom) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: custom * 0.05,
+      duration: 0.3
+    }
+  })
+};
+
+const statsVariants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: (custom) => ({
+    opacity: 1,
+    scale: 1,
+    transition: {
+      delay: 0.1 + custom * 0.1,
+      duration: 0.3
+    }
+  })
+};
+
+// ==================== MAIN COMPONENT ====================
+
+/**
+ * Check-in Modal Component
+ * Allows staff to check in donors and complete donations for an ongoing event
+ * 
+ * @param {string} eventId - ID of the event
+ * @param {Function} onClose - Function to close the modal
+ * @param {Function} refreshEvents - Function to refresh events list
+ */
 const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
   const { axiosInstance } = useAxiosPublic();
   const token = localStorage.getItem("auth_token");
 
-  // States
+  // ==================== STATE MANAGEMENT ====================
+
   const [loading, setLoading] = useState(true);
   const [eventData, setEventData] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Check-in mutation
+  // ==================== MUTATIONS ====================
+
+  /**
+   * Mutation 1: Check-in donor
+   */
   const checkInMutation = useMutation({
     mutationFn: async (donorId) => {
       const response = await axiosInstance.patch(
@@ -49,7 +111,9 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
     },
   });
 
-  // Complete donation mutation
+  /**
+   * Mutation 2: Complete donation
+   */
   const completeMutation = useMutation({
     mutationFn: async (donorId) => {
       const response = await axiosInstance.patch(
@@ -61,7 +125,11 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
     },
   });
 
-  // Fetch event data
+  // ==================== EFFECTS ====================
+
+  /**
+   * Fetch event data when component mounts
+   */
   useEffect(() => {
     const fetchEventData = async () => {
       if (!eventId) return;
@@ -85,7 +153,11 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
     fetchEventData();
   }, [eventId, axiosInstance, token]);
 
-  // Filter donors by search
+  // ==================== COMPUTED VALUES ====================
+
+  /**
+   * Filter donors by search term
+   */
   const filteredDonors = eventData?.registeredDonors?.filter(donor => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
@@ -95,7 +167,21 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
     );
   }) || [];
 
-  // Handle check-in
+  /**
+   * Calculate donor statistics
+   */
+  const donorStats = {
+    registered: eventData?.registeredDonors?.filter(d => d.status === "registered").length || 0,
+    checkedIn: eventData?.registeredDonors?.filter(d => d.status === "checked_in").length || 0,
+    donated: eventData?.registeredDonors?.filter(d => d.status === "donated").length || 0,
+    cancelled: eventData?.registeredDonors?.filter(d => d.status === "cancelled").length || 0,
+  };
+
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Handle check-in for a donor
+   */
   const handleCheckIn = async (donor) => {
     setActionLoading(true);
     try {
@@ -114,9 +200,12 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
         icon: "success",
         timer: 2000,
         showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
         },
+        buttonsStyling: false,
       });
     } catch (error) {
       console.error("Check-in error:", error);
@@ -124,8 +213,10 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
         title: "Error",
         text: error.response?.data?.error || "Failed to check in donor",
         icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           confirmButton: "btn btn-sm btn-error",
         },
         buttonsStyling: false,
@@ -135,7 +226,9 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
     }
   };
 
-  // Handle complete donation
+  /**
+   * Handle complete donation for a donor
+   */
   const handleComplete = async (donor) => {
     setActionLoading(true);
     try {
@@ -154,9 +247,12 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
         icon: "success",
         timer: 2000,
         showConfirmButton: false,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
         },
+        buttonsStyling: false,
       });
     } catch (error) {
       console.error("Complete error:", error);
@@ -164,8 +260,10 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
         title: "Error",
         text: error.response?.data?.error || "Failed to complete donation",
         icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           confirmButton: "btn btn-sm btn-error",
         },
         buttonsStyling: false,
@@ -175,58 +273,87 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
     }
   };
 
+  // ==================== LOADING STATE ====================
+
   if (loading) return <BloodLoader fullscreen={false} />;
   if (!eventData) return null;
 
+  // Check if event is ongoing (only ongoing events can have check-ins)
   const canCheckIn = eventData.status?.current === "ongoing";
 
+  // ==================== RENDER ====================
+
   return (
-    <div className="modal-box w-11/12 max-w-2xl p-0 overflow-hidden bg-base-100">
-      {/* Header */}
-      <div className="bg-linear-to-r from-success to-success/80 p-6 text-white">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-3 rounded-full">
-              <FaUserCheck size={24} />
+    <motion.div
+      variants={modalVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="modal-box w-11/12 max-w-2xl p-0 overflow-hidden bg-base-100 mx-2 sm:mx-0"
+    >
+
+      {/* ==================== MODAL HEADER ==================== */}
+      <div className="bg-linear-to-r from-success to-success/80 p-4 sm:p-6 text-white">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+
+          {/* Title and icon */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-white/20 p-2 sm:p-3 rounded-full">
+              <FaUserCheck size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-2xl">Check-in Donors</h3>
-              <p className="text-white/80 text-sm">{eventData.title}</p>
+              <h2 className="font-bold text-lg sm:text-2xl">Check-in Donors</h2>
+              <p className="text-white/80 text-xs sm:text-sm truncate max-w-48 sm:max-w-64">
+                {eventData.title}
+              </p>
             </div>
           </div>
+
+          {/* Close button */}
           <button
             onClick={onClose}
-            className="btn btn-ghost btn-sm btn-circle text-white hover:bg-white/20"
+            className="btn btn-ghost btn-xs sm:btn-sm btn-circle text-white hover:bg-white/20 self-end sm:self-auto"
+            aria-label="Close modal"
           >
-            <FaTimes size={20} />
+            <FaTimes size={14} className="sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
-      {!canCheckIn ? (
-        <div className="p-6 text-center">
-          <FaExclamationTriangle className="text-warning text-4xl mx-auto mb-3" />
-          <p className="text-lg font-medium mb-2">Event is not ongoing</p>
-          <p className="text-sm text-base-content/70 mb-4">
-            Check-in is only available for ongoing events.
-          </p>
-          <button onClick={onClose} className="btn btn-primary">
-            Close
-          </button>
-        </div>
-      ) : (
+      {/* ==================== NOT ONGOING STATE ==================== */}
+      <AnimatePresence>
+        {!canCheckIn && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="p-4 sm:p-6 text-center"
+          >
+            <FaExclamationTriangle className="text-warning text-2xl sm:text-4xl mx-auto mb-3" />
+            <p className="text-base sm:text-lg font-medium mb-2">Event is not ongoing</p>
+            <p className="text-xs sm:text-sm text-base-content/70 mb-4">
+              Check-in is only available for ongoing events.
+            </p>
+            <button onClick={onClose} className="btn btn-primary btn-sm sm:btn-md">
+              Close
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {canCheckIn && (
         <>
-          {/* Search */}
-          <div className="p-4 border-b border-base-300">
+          {/* ==================== SEARCH INPUT ==================== */}
+          <div className="p-3 sm:p-4 border-b border-base-300">
             <div className="form-control">
-              <div className="input-group">
-                <span className="bg-base-200 border border-r-0 border-base-300 flex items-center px-3 rounded-l-lg">
-                  <FaSearch className="text-base-content/50" />
+              <div className="flex">
+                <span className="bg-base-200 border border-r-0 border-base-300 flex items-center px-2 sm:px-3 rounded-l-lg">
+                  <FaSearch className="text-base-content/50 text-xs sm:text-sm" />
                 </span>
                 <input
                   type="text"
                   placeholder="Search donors by name or blood type..."
-                  className="input input-bordered w-full rounded-l-none"
+                  className="input input-bordered input-sm sm:input-md w-full rounded-l-none"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -234,75 +361,100 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
             </div>
           </div>
 
-          {/* Donor Stats */}
-          <div className="grid grid-cols-3 gap-2 p-4 bg-base-200/50">
-            <div className="text-center">
-              <p className="text-xs opacity-70">Registered</p>
-              <p className="text-xl font-bold text-warning">
-                {eventData.registeredDonors?.filter(d => d.status === "registered").length || 0}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs opacity-70">Checked In</p>
-              <p className="text-xl font-bold text-info">
-                {eventData.registeredDonors?.filter(d => d.status === "checked_in").length || 0}
-              </p>
-            </div>
-            <div className="text-center">
-              <p className="text-xs opacity-70">Donated</p>
-              <p className="text-xl font-bold text-success">
-                {eventData.registeredDonors?.filter(d => d.status === "donated").length || 0}
-              </p>
-            </div>
-          </div>
+          {/* ==================== DONOR STATS ==================== */}
+          <motion.div
+            className="grid grid-cols-3 gap-1 sm:gap-2 p-3 sm:p-4 bg-base-200/50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            {/* Registered Stat */}
+            <motion.div
+              className="text-center"
+              variants={statsVariants}
+              custom={0}
+            >
+              <p className="text-[10px] sm:text-xs opacity-70">Registered</p>
+              <p className="text-base sm:text-lg md:text-xl font-bold text-warning">{donorStats.registered}</p>
+            </motion.div>
 
-          {/* Donors List */}
-          <div className="p-4 max-h-[40vh] overflow-y-auto">
+            {/* Checked In Stat */}
+            <motion.div
+              className="text-center"
+              variants={statsVariants}
+              custom={1}
+            >
+              <p className="text-[10px] sm:text-xs opacity-70">Checked In</p>
+              <p className="text-base sm:text-lg md:text-xl font-bold text-info">{donorStats.checkedIn}</p>
+            </motion.div>
+
+            {/* Donated Stat */}
+            <motion.div
+              className="text-center"
+              variants={statsVariants}
+              custom={2}
+            >
+              <p className="text-[10px] sm:text-xs opacity-70">Donated</p>
+              <p className="text-base sm:text-lg md:text-xl font-bold text-success">{donorStats.donated}</p>
+            </motion.div>
+          </motion.div>
+
+          {/* ==================== DONORS LIST ==================== */}
+          <div className="p-3 sm:p-4 max-h-[35vh] sm:max-h-[40vh] overflow-y-auto">
             {filteredDonors.length > 0 ? (
-              <div className="space-y-3">
+              <motion.div
+                className="space-y-2 sm:space-y-3"
+                initial="hidden"
+                animate="visible"
+              >
                 {filteredDonors.map((donor, index) => (
                   <motion.div
                     key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    className="bg-base-200 rounded-lg p-4"
+                    variants={donorItemVariants}
+                    custom={index}
+                    className="bg-base-200 rounded-lg p-3 sm:p-4"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+
+                      {/* Donor Info */}
+                      <div className="flex items-center gap-2 sm:gap-3">
                         <div className="avatar placeholder">
-                          <div className="bg-primary/10 text-primary rounded-full w-10 h-10 flex items-center justify-center">
-                            <FiUser size={18} />
+                          <div className="bg-primary/10 text-primary rounded-full w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">
+                            <FiUser size={12} className="sm:w-4 sm:h-4" />
                           </div>
                         </div>
                         <div>
-                          <p className="font-medium">{donor.donorName || "Anonymous Donor"}</p>
-                          <div className="flex items-center gap-2 text-sm">
+                          <p className="font-medium text-xs sm:text-sm">{donor.donorName || "Anonymous Donor"}</p>
+                          <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-2 text-[10px] sm:text-xs">
+                            {/* Blood Type */}
                             <span className="flex items-center gap-1">
-                              <FiDroplet size={12} className="text-error" />
+                              <FiDroplet size={8} className="sm:w-3 sm:h-3 text-error" />
                               {donor.donorBloodGroup || "Unknown"}
                             </span>
+                            {/* Registration Time */}
                             <span className="flex items-center gap-1">
-                              <FiClock size={12} className="opacity-50" />
+                              <FiClock size={8} className="sm:w-3 sm:h-3 opacity-50" />
                               {formatAppTime(donor.registrationDate)}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <span className={`badge badge-sm ${donor.status === "donated" ? "badge-success" :
-                            donor.status === "checked_in" ? "badge-info" :
-                              donor.status === "cancelled" ? "badge-error" :
-                                "badge-warning"
+                      {/* Status and Actions */}
+                      <div className="flex items-center gap-2 self-end sm:self-auto">
+                        {/* Status Badge */}
+                        <span className={`badge badge-xs sm:badge-sm ${donor.status === "donated" ? "badge-success" :
+                          donor.status === "checked_in" ? "badge-info" :
+                            donor.status === "cancelled" ? "badge-error" :
+                              "badge-warning"
                           }`}>
                           {donor.status}
                         </span>
 
+                        {/* Action Buttons */}
                         {donor.status === "registered" && (
                           <button
                             onClick={() => handleCheckIn(donor)}
-                            className="btn btn-xs btn-success"
+                            className="btn btn-success btn-xs sm:btn-sm"
                             disabled={actionLoading}
                           >
                             Check In
@@ -312,38 +464,46 @@ const CheckInModal = ({ eventId, onClose, refreshEvents }) => {
                         {donor.status === "checked_in" && (
                           <button
                             onClick={() => handleComplete(donor)}
-                            className="btn btn-xs btn-success"
+                            className="btn btn-success btn-xs sm:btn-sm gap-1"
                             disabled={actionLoading}
                           >
-                            <FaCheckDouble size={12} className="mr-1" />
-                            Complete
+                            <FaCheckDouble size={8} className="sm:w-3 sm:h-3" />
+                            <span className="text-[10px] sm:text-xs">Complete</span>
                           </button>
                         )}
                       </div>
                     </div>
                   </motion.div>
                 ))}
-              </div>
+              </motion.div>
             ) : (
-              <div className="text-center py-8 text-base-content/70">
-                <FaUserPlus size={48} className="mx-auto mb-3 opacity-50" />
-                <p>No donors found</p>
+              // Empty State
+              <motion.div
+                className="text-center py-6 sm:py-8 text-base-content/70"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <FaUserPlus size={32} className="sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 opacity-50" />
+                <p className="text-xs sm:text-sm">No donors found</p>
                 {searchTerm && (
-                  <p className="text-sm mt-2">Try adjusting your search</p>
+                  <p className="text-[10px] sm:text-xs mt-2">Try adjusting your search</p>
                 )}
-              </div>
+              </motion.div>
             )}
           </div>
 
-          {/* Footer */}
-          <div className="modal-action border-t border-base-300 p-4 bg-base-200/50">
-            <button onClick={onClose} className="btn btn-ghost ml-auto">
-              Close
+          {/* ==================== MODAL FOOTER ==================== */}
+          <div className="modal-action border-t border-base-300 p-3 sm:p-4 bg-base-200/50">
+            <button
+              onClick={onClose}
+              className="btn btn-ghost btn-sm sm:btn-md ml-auto"
+            >
+              <span className="text-xs sm:text-sm">Close</span>
             </button>
           </div>
         </>
       )}
-    </div>
+    </motion.div>
   );
 };
 
