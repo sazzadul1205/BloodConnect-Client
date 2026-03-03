@@ -2,7 +2,7 @@
 
 // React
 import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 // eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
@@ -51,12 +51,72 @@ import AddUserModal from "./AddUserModal/AddUserModal";
 import EditUserModal from "./EditUserModal/EditUserModal";
 import ViewUserModal from "./ViewUserModal/ViewUserModal";
 
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  allUsers: ['all-users'],
+};
+
+// ==================== CONSTANTS ====================
+
+/**
+ * Role configuration for different user types
+ * Each role has a specific color, icon, and label
+ */
+const roleConfig = {
+  admin: { color: "badge-error", icon: FiShield, label: "Admin" },
+  hospital: { color: "badge-info", icon: FiMapPin, label: "Hospital" },
+  donor: { color: "badge-success", icon: FaHeartbeat, label: "Donor" },
+  super_admin: { color: "badge-error", icon: FiShield, label: "Super Admin" },
+  requester: { color: "badge-warning", icon: FiUserCheck, label: "Requester" },
+  blood_bank: { color: "badge-secondary", icon: FiDroplet, label: "Blood Bank" },
+};
+
+// ==================== ANIMATION VARIANTS ====================
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const tableRowVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: (custom) => ({
+    opacity: 1,
+    x: 0,
+    transition: {
+      delay: 0.35 + custom * 0.02,
+      duration: 0.3
+    }
+  })
+};
+
+// ==================== MAIN COMPONENT ====================
+
+/**
+ * Users Management Component
+ * Allows admin to view, filter, add, edit, and delete users
+ * 
+ * @returns {JSX.Element} Users management page
+ */
 const UsersManagement = () => {
   const { axiosInstance } = useAxiosPublic();
   const { user: currentUser } = useAuth();
+  const queryClient = useQueryClient();
   const token = localStorage.getItem("auth_token");
 
-  // Pagination states
+  // ==================== STATE MANAGEMENT ====================
+
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("all");
@@ -67,17 +127,11 @@ const UsersManagement = () => {
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [selectedVerification, setSelectedVerification] = useState("");
 
-  // Role colors and styles
-  const roleConfig = {
-    admin: { color: "badge-error", icon: FiShield, label: "Admin" },
-    hospital: { color: "badge-info", icon: FiMapPin, label: "Hospital" },
-    donor: { color: "badge-success", icon: FaHeartbeat, label: "Donor" },
-    super_admin: { color: "badge-error", icon: FiShield, label: "Super Admin" },
-    requester: { color: "badge-warning", icon: FiUserCheck, label: "Requester" },
-    blood_bank: { color: "badge-secondary", icon: FiDroplet, label: "Blood Bank" },
-  };
+  // ==================== TANSTACK QUERIES ====================
 
-  // 🔹 Fetch All Users
+  /**
+   * Query: Fetch all users
+   */
   const {
     data: allUsers,
     isLoading: loadingUsers,
@@ -85,33 +139,46 @@ const UsersManagement = () => {
     error: usersErrorData,
     refetch: usersRefetch,
   } = useQuery({
-    queryKey: ["all-users"],
+    queryKey: queryKeys.allUsers,
     queryFn: async () => {
       const res = await axiosInstance.get("/users/admin/all-users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Filter users based on tab, search, role, and verification
-  const getFilteredUsers = () => {
+  // ==================== COMPUTED VALUES ====================
+
+  /**
+   * Filter users based on active tab, search term, role, and verification status
+   */
+  const filteredUsers = React.useMemo(() => {
     if (!allUsers?.data) return [];
 
     let filtered = allUsers.data;
 
     // Filter by tab (user type)
     if (activeTab !== "all") {
-      if (activeTab === "donors") {
-        filtered = filtered.filter(user => user.role === "donor");
-      } else if (activeTab === "hospitals") {
-        filtered = filtered.filter(user => user.role === "hospital");
-      } else if (activeTab === "requesters") {
-        filtered = filtered.filter(user => user.role === "requester");
-      } else if (activeTab === "blood_banks") {
-        filtered = filtered.filter(user => user.role === "blood_bank");
-      } else if (activeTab === "admins") {
-        filtered = filtered.filter(user => user.role === "admin" || user.role === "super_admin");
+      switch (activeTab) {
+        case "donors":
+          filtered = filtered.filter(user => user.role === "donor");
+          break;
+        case "hospitals":
+          filtered = filtered.filter(user => user.role === "hospital");
+          break;
+        case "requesters":
+          filtered = filtered.filter(user => user.role === "requester");
+          break;
+        case "blood_banks":
+          filtered = filtered.filter(user => user.role === "blood_bank");
+          break;
+        case "admins":
+          filtered = filtered.filter(user => user.role === "admin" || user.role === "super_admin");
+          break;
+        default:
+          break;
       }
     }
 
@@ -133,17 +200,30 @@ const UsersManagement = () => {
 
     // Filter by verification status
     if (selectedVerification) {
-      if (selectedVerification === "verified") {
-        filtered = filtered.filter(user => user.verification?.isEmailVerified);
-      } else if (selectedVerification === "unverified") {
-        filtered = filtered.filter(user => !user.verification?.isEmailVerified);
-      }
+      filtered = filtered.filter(user => {
+        const isVerified = user.verification?.isEmailVerified;
+        return selectedVerification === "verified" ? isVerified : !isVerified;
+      });
     }
 
     return filtered;
-  };
+  }, [allUsers, activeTab, searchTerm, selectedRole, selectedVerification]);
 
-  const filteredUsers = getFilteredUsers();
+  /**
+   * Calculate statistics
+   */
+  const stats = React.useMemo(() => {
+    const users = allUsers?.data || [];
+    return {
+      total: users.length,
+      donors: users.filter(u => u.role === "donor").length,
+      hospitals: users.filter(u => u.role === "hospital").length,
+      requesters: users.filter(u => u.role === "requester").length,
+      bloodBanks: users.filter(u => u.role === "blood_bank").length,
+      admins: users.filter(u => u.role === "admin" || u.role === "super_admin").length,
+      verified: users.filter(u => u.verification?.isEmailVerified).length,
+    };
+  }, [allUsers]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
@@ -151,39 +231,37 @@ const UsersManagement = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
 
-  // Format date
+  // ==================== HELPER FUNCTIONS ====================
+
+  /**
+   * Format date for display
+   */
   const formatDate = (dateString) => {
     return formatAppDate(dateString);
   };
 
-  // Get verification badge
+  /**
+   * Get verification badge based on user's email verification status
+   */
   const getVerificationBadge = (user) => {
     const isVerified = user.verification?.isEmailVerified;
     return isVerified ? (
-      <div className="badge badge-success gap-1">
-        <FiCheckCircle size={12} />
-        Verified
+      <div className="badge badge-success badge-xs sm:badge-sm gap-1">
+        <FiCheckCircle size={8} className="sm:w-3 sm:h-3" />
+        <span className="text-[10px] sm:text-xs">Verified</span>
       </div>
     ) : (
-      <div className="badge badge-ghost gap-1">
-        <FiXCircle size={12} />
-        Unverified
+      <div className="badge badge-ghost badge-xs sm:badge-sm gap-1">
+        <FiXCircle size={8} className="sm:w-3 sm:h-3" />
+        <span className="text-[10px] sm:text-xs">Unverified</span>
       </div>
     );
   };
 
-  // Handle page change
-  const handlePageChange = (page) => {
-    setCurrentPage(page);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  // Handle export button click
-  const handleExport = () => {
-    showExportOptions(filteredUsers, activeTab, setIsExporting);
-  };
-
-  // RBAC: determine if current user can manage a target role
+  /**
+   * Check if current user can manage a user with the given role
+   * Implements role-based access control (RBAC)
+   */
   const canManageRole = (targetRole) => {
     if (currentUser?.role === "super_admin") {
       // Super admin can manage all except super admin accounts
@@ -198,9 +276,29 @@ const UsersManagement = () => {
     return false;
   };
 
-  // Delete user handler with SweetAlert2
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Handle page change with smooth scroll to top
+   */
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /**
+   * Handle export button click
+   */
+  const handleExport = () => {
+    showExportOptions(filteredUsers, activeTab, setIsExporting);
+  };
+
+  /**
+   * Handle delete user with confirmation
+   */
   const handleDeleteUser = async (userId, userName, userRole) => {
     try {
+      // Check permissions first
       if (!canManageRole(userRole)) {
         await Swal.fire({
           title: "Protected User",
@@ -208,13 +306,17 @@ const UsersManagement = () => {
           icon: "warning",
           timer: 2000,
           showConfirmButton: false,
+          background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+          color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
           customClass: {
-            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           },
+          buttonsStyling: false,
         });
         return;
       }
 
+      // Show confirmation dialog
       const result = await Swal.fire({
         title: "Are you sure?",
         html: `
@@ -232,10 +334,12 @@ const UsersManagement = () => {
         confirmButtonText: "Yes, delete user",
         cancelButtonText: "Cancel",
         reverseButtons: true,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           title: "text-lg font-bold text-error",
-          htmlContainer: "text-base text-base-content/80",
+          htmlContainer: "text-xs sm:text-sm text-base-content/80",
           confirmButton: "btn btn-sm btn-error text-white",
           cancelButton: "btn btn-sm",
         },
@@ -279,17 +383,19 @@ const UsersManagement = () => {
           showConfirmButton: true,
           confirmButtonColor: "#22c55e",
           confirmButtonText: "OK",
+          background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+          color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
           customClass: {
-            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
             title: "text-lg font-bold text-success",
-            htmlContainer: "text-base text-base-content/80",
+            htmlContainer: "text-xs sm:text-sm text-base-content/80",
             confirmButton: "btn btn-sm btn-success text-white",
           },
           buttonsStyling: false,
         });
 
-        // Refresh the users list
-        usersRefetch();
+        // Invalidate queries to refresh data
+        queryClient.invalidateQueries({ queryKey: queryKeys.allUsers });
       }
     } catch (error) {
       console.error("Delete error:", error);
@@ -301,10 +407,12 @@ const UsersManagement = () => {
         showConfirmButton: true,
         confirmButtonColor: "#ef4444",
         confirmButtonText: "OK",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           title: "text-lg font-bold text-error",
-          content: "text-base text-base-content/80",
+          content: "text-xs sm:text-sm text-base-content/80",
           confirmButton: "btn btn-sm btn-error text-white",
         },
         buttonsStyling: false,
@@ -312,15 +420,25 @@ const UsersManagement = () => {
     }
   };
 
+  /**
+   * Close all modals
+   */
+  const CloseModal = () => {
+    setSelectedUserId(null);
+    document.getElementById('add_user_modal')?.close();
+    document.getElementById('view_user_modal')?.close();
+    document.getElementById('edit_user_modal')?.close();
+  };
+
   // Reset pagination when filters change
   React.useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, searchTerm, selectedRole, selectedVerification]);
 
-  // Loading state
+  // ==================== LOADING & ERROR STATES ====================
+
   if (loadingUsers) return <BloodLoader />;
 
-  // Error state
   if (usersError) {
     return (
       <ErrorState
@@ -330,239 +448,207 @@ const UsersManagement = () => {
     );
   }
 
-  const CloseModal = () => {
-    setSelectedUserId(null);
-    document.getElementById('add_user_modal')?.close();
-    document.getElementById('view_user_modal')?.close();
-    document.getElementById('edit_user_modal')?.close();
-  };
+  // ==================== RENDER ====================
 
   return (
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section with Fade In */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={staggerContainer}
+      className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6"
+    >
+
+      {/* ==================== HEADER SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+        variants={fadeInUp}
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
       >
-        {/* Header copy: communicates context and purpose of user management dashboard. */}
+        {/* Title and description */}
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            {/* Visual identity icon for user management system. */}
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <FiUsers className="text-error" />
             Users Management
-          </h2>
-          <p className="text-base-content/70 text-sm mt-1">
+          </h1>
+          <p className="text-xs sm:text-sm text-base-content/70 mt-1">
             Manage all users, verify accounts, and monitor activity
           </p>
         </div>
 
-        {/* Action Buttons: export and add user utilities. */}
-        <div className="flex gap-2">
-          {/* Export Button with Count: exports current filtered user set. */}
+        {/* Action Buttons */}
+        <div className="flex gap-2 w-full sm:w-auto">
+          {/* Export Button */}
           <button
             onClick={handleExport}
-            className="btn btn-outline btn-sm gap-2"
+            className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2 flex-1 sm:flex-none"
             disabled={isExporting || filteredUsers.length === 0}
           >
             {isExporting ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
-                Exporting...
+                <span className="loading loading-spinner loading-xs"></span>
+                <span className="text-xs sm:text-sm">Exporting...</span>
               </>
             ) : (
               <>
-                <FiDownload size={16} />
-                Export ({filteredUsers.length})
+                <FiDownload size={12} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">Export ({filteredUsers.length})</span>
               </>
             )}
           </button>
 
-          {/* Add User Button: opens modal for new user creation. */}
+          {/* Add User Button */}
           <button
             onClick={() => document.getElementById('add_user_modal')?.showModal()}
-            className="btn btn-error btn-sm gap-2"
+            className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2 flex-1 sm:flex-none"
           >
-            <FiUserPlus size={16} />
-            Add User
+            <FiUserPlus size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">Add User</span>
           </button>
         </div>
       </motion.div>
 
-      {/* Stats Cards with Staggered Fade In */}
+      {/* ==================== STATS CARDS ==================== */}
       <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: {
-              staggerChildren: 0.1 // Each card fades in sequentially with 0.1s delay
-            }
-          }
-        }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"
+        variants={staggerContainer}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4"
       >
-        {/* Card 1: Total Users - overall account count. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-error">
-            <FiUsers size={24} />
+        {/* Total Users Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Total Users</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-error">{stats.total}</p>
+            </div>
+            <div className="stat-figure bg-error/10 p-2 rounded-full">
+              <FiUsers className="text-error text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Total Users</p>
-          <p className="stat-value text-3xl">{allUsers?.count || 0}</p>
-          <p className="stat-desc">Active accounts</p>
+          <p className="stat-desc text-xs mt-2">Active accounts</p>
         </motion.div>
 
-        {/* Card 2: Donors - blood donor count with success color. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-success">
-            <FaHeartbeat size={24} />
+        {/* Donors Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Donors</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-success">{stats.donors}</p>
+            </div>
+            <div className="stat-figure bg-success/10 p-2 rounded-full">
+              <FaHeartbeat className="text-success text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Donors</p>
-          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "donor").length || 0}</p>
-          <p className="stat-desc">Ready to donate</p>
+          <p className="stat-desc text-xs mt-2">Ready to donate</p>
         </motion.div>
 
-        {/* Card 3: Hospitals - medical facilities count. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-info">
-            <FiMapPin size={24} />
+        {/* Hospitals Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Hospitals</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-info">{stats.hospitals}</p>
+            </div>
+            <div className="stat-figure bg-info/10 p-2 rounded-full">
+              <FiMapPin className="text-info text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Hospitals</p>
-          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "hospital").length || 0}</p>
-          <p className="stat-desc">Medical facilities</p>
+          <p className="stat-desc text-xs mt-2">Medical facilities</p>
         </motion.div>
 
-        {/* Card 4: Requesters - users requesting blood. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-warning">
-            <FiUserCheck size={24} />
+        {/* Requesters Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Requesters</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-warning">{stats.requesters}</p>
+            </div>
+            <div className="stat-figure bg-warning/10 p-2 rounded-full">
+              <FiUserCheck className="text-warning text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Requesters</p>
-          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.role === "requester").length || 0}</p>
-          <p className="stat-desc">Active requests</p>
+          <p className="stat-desc text-xs mt-2">Active requests</p>
         </motion.div>
 
-        {/* Card 5: Verified - email-verified users count. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-success">
-            <FiCheckCircle size={24} />
+        {/* Verified Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Verified</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-success">{stats.verified}</p>
+            </div>
+            <div className="stat-figure bg-success/10 p-2 rounded-full">
+              <FiCheckCircle className="text-success text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Verified</p>
-          <p className="stat-value text-3xl">{allUsers?.data?.filter(u => u.verification?.isEmailVerified).length || 0}</p>
-          <p className="stat-desc">Email verified</p>
+          <p className="stat-desc text-xs mt-2">Email verified</p>
         </motion.div>
       </motion.div>
 
-      {/* Tabs with Fade In - role-based filtering navigation */}
+      {/* ==================== TABS ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
+        variants={fadeInUp}
         className="tabs tabs-boxed bg-base-100 p-1 border border-base-300 overflow-x-auto flex-nowrap"
       >
         <button
-          className={`tab tab-sm ${activeTab === "all" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-sm ${activeTab === "all" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("all")}
         >
           All Users
         </button>
         <button
-          className={`tab tab-sm ${activeTab === "donors" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-sm ${activeTab === "donors" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("donors")}
         >
           Donors
         </button>
         <button
-          className={`tab tab-sm ${activeTab === "hospitals" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-sm ${activeTab === "hospitals" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("hospitals")}
         >
           Hospitals
         </button>
         <button
-          className={`tab tab-sm ${activeTab === "requesters" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-sm ${activeTab === "requesters" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("requesters")}
         >
           Requesters
         </button>
         <button
-          className={`tab tab-sm ${activeTab === "blood_banks" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-sm ${activeTab === "blood_banks" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("blood_banks")}
         >
           Blood Banks
         </button>
         <button
-          className={`tab tab-sm ${activeTab === "admins" ? "tab-active" : ""}`}
+          className={`tab tab-xs sm:tab-sm ${activeTab === "admins" ? "tab-active" : ""}`}
           onClick={() => setActiveTab("admins")}
         >
           Admins
         </button>
       </motion.div>
 
-      {/* Filters Section with Fade In */}
+      {/* ==================== FILTERS SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4"
+        variants={fadeInUp}
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-3 sm:p-4"
       >
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search input: free-text search across user fields. */}
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
+
+          {/* Search Input */}
           <div className="flex-1">
             <div className="form-control">
-              <div className="input-group">
-                <input
-                  type="text"
-                  placeholder="Search by name, email, phone, blood group..."
-                  className="input input-bordered w-full"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Search by name, email, phone, blood group..."
+                className="input input-bordered input-sm sm:input-md w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
           </div>
 
-          {/* Role Filter: dropdown for role-based filtering. */}
+          {/* Role Filter */}
           <div className="w-full lg:w-48">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={selectedRole}
               onChange={(e) => setSelectedRole(e.target.value)}
             >
@@ -575,10 +661,10 @@ const UsersManagement = () => {
             </select>
           </div>
 
-          {/* Verification Filter: filters by email verification status. */}
+          {/* Verification Filter */}
           <div className="w-full lg:w-48">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={selectedVerification}
               onChange={(e) => setSelectedVerification(e.target.value)}
             >
@@ -588,9 +674,9 @@ const UsersManagement = () => {
             </select>
           </div>
 
-          {/* Reset Filters: clears all filter inputs. */}
+          {/* Reset Filters Button */}
           <button
-            className="btn btn-outline btn-square"
+            className="btn btn-outline btn-sm btn-square"
             onClick={() => {
               setSearchTerm("");
               setSelectedRole("");
@@ -598,17 +684,13 @@ const UsersManagement = () => {
               setActiveTab("all");
             }}
           >
-            <FiRefreshCw size={18} />
+            <FiRefreshCw size={14} className="sm:w-4 sm:h-4" />
           </button>
         </div>
       </motion.div>
 
-      {/* Results Count with Fade In: shows current range and total items. */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.25 }}
-      >
+      {/* ==================== RESULTS COUNT ==================== */}
+      <motion.div variants={fadeInUp}>
         <ResultsCount
           endIndex={endIndex}
           startIndex={startIndex}
@@ -619,30 +701,26 @@ const UsersManagement = () => {
         />
       </motion.div>
 
-      {/* Main Users Table with Fade In */}
+      {/* ==================== USERS TABLE ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
+        variants={fadeInUp}
         className="overflow-x-auto bg-base-100 rounded-lg shadow-lg border border-base-300"
       >
-        <table className="table table-zebra w-full">
-          {/* Table Header: column definitions for user data. */}
+        <table className="table table-xs sm:table-sm md:table-md w-full">
           <thead>
             <tr className="bg-base-200">
-              <th className="w-12">#</th>
-              <th>User</th>
-              <th>Role</th>
-              <th>Contact</th>
-              <th>Blood Group</th>
-              <th>Location</th>
-              <th>Status</th>
-              <th>Joined</th>
-              <th className="text-center">Actions</th>
+              <th className="text-xs sm:text-sm w-12">#</th>
+              <th className="text-xs sm:text-sm">User</th>
+              <th className="text-xs sm:text-sm">Role</th>
+              <th className="text-xs sm:text-sm hidden md:table-cell">Contact</th>
+              <th className="text-xs sm:text-sm hidden lg:table-cell">Blood Group</th>
+              <th className="text-xs sm:text-sm hidden xl:table-cell">Location</th>
+              <th className="text-xs sm:text-sm">Status</th>
+              <th className="text-xs sm:text-sm hidden lg:table-cell">Joined</th>
+              <th className="text-xs sm:text-sm text-center">Actions</th>
             </tr>
           </thead>
 
-          {/* Table Body with staggered row animations */}
           <tbody>
             {paginatedUsers.length > 0 ? (
               paginatedUsers.map((user, index) => {
@@ -653,19 +731,19 @@ const UsersManagement = () => {
                 return (
                   <motion.tr
                     key={user._id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.35 + index * 0.02 }}
+                    variants={tableRowVariants}
+                    custom={index}
+                    initial="hidden"
+                    animate="visible"
                     className="hover"
                   >
-                    {/* User Index: sequential number with pagination offset. */}
-                    <td className="font-medium">{startIndex + index + 1}</td>
+                    <td className="text-xs sm:text-sm font-medium">{startIndex + index + 1}</td>
 
-                    {/* User Details: avatar + name + username */}
+                    {/* User Details */}
                     <td>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
                         <div className="avatar">
-                          <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-error/10 flex items-center justify-center">
                             {user.profile?.profilePicture ? (
                               <img
                                 src={user.profile.profilePicture}
@@ -673,134 +751,132 @@ const UsersManagement = () => {
                                 className="rounded-full"
                               />
                             ) : (
-                              <FaUserCircle className="text-error text-2xl" />
+                              <FaUserCircle className="text-error text-sm sm:text-base" />
                             )}
                           </div>
                         </div>
                         <div>
-                          <div className="font-semibold">
+                          <div className="font-semibold text-xs sm:text-sm truncate max-w-24 sm:max-w-32">
                             {user.profile?.fullName || "N/A"}
                           </div>
-                          <div className="text-sm text-base-content/70">
+                          <div className="text-[10px] sm:text-xs text-base-content/70 truncate max-w-24 sm:max-w-32">
                             @{user.username || "username"}
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* User Role: color-coded badge with icon */}
+                    {/* User Role */}
                     <td>
-                      <div className={`badge ${roleConfig[user.role]?.color || "badge-ghost"} gap-1`}>
-                        <RoleIcon size={12} />
-                        {roleConfig[user.role]?.label || user.role}
+                      <div className={`badge ${roleConfig[user.role]?.color || "badge-ghost"} badge-xs sm:badge-sm gap-1`}>
+                        <RoleIcon size={8} className="sm:w-3 sm:h-3" />
+                        <span className="text-[10px] sm:text-xs">{roleConfig[user.role]?.label || user.role}</span>
                       </div>
                     </td>
 
-                    {/* User Contact: email and phone with icons */}
-                    <td>
+                    {/* Contact - Hidden on mobile */}
+                    <td className="hidden md:table-cell">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-sm">
-                          <FiMail size={12} className="text-base-content/50" />
-                          <span className="truncate max-w-37.5">{user.email}</span>
+                        <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                          <FiMail size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
+                          <span className="truncate max-w-32">{user.email}</span>
                         </div>
                         {user.phone && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <FiPhone size={12} className="text-base-content/50" />
+                          <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                            <FiPhone size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
                             <span>{user.phone}</span>
                           </div>
                         )}
                       </div>
                     </td>
 
-                    {/* User Blood Group: highlighted in error color */}
-                    <td>
+                    {/* Blood Group - Hidden on tablet */}
+                    <td className="hidden lg:table-cell">
                       {user.profile?.bloodGroup ? (
-                        <div className="font-semibold text-error">
+                        <div className="font-semibold text-error text-xs sm:text-sm">
                           {user.profile.bloodGroup}
                         </div>
                       ) : (
-                        <span className="text-base-content/50">—</span>
+                        <span className="text-base-content/50 text-xs sm:text-sm">—</span>
                       )}
                     </td>
 
-                    {/* User Location: city with map pin icon */}
-                    <td>
+                    {/* Location - Hidden on desktop */}
+                    <td className="hidden xl:table-cell">
                       {user.address?.city ? (
-                        <div className="flex items-center gap-1 text-sm">
-                          <FiMapPin size={12} className="text-base-content/50" />
+                        <div className="flex items-center gap-1 text-xs sm:text-sm">
+                          <FiMapPin size={10} className="sm:w-3 sm:h-3 text-base-content/50" />
                           <span>{user.address.city}</span>
                         </div>
                       ) : (
-                        <span className="text-base-content/50">—</span>
+                        <span className="text-base-content/50 text-xs sm:text-sm">—</span>
                       )}
                     </td>
 
-                    {/* User Status: verification badge + deletion indicator */}
+                    {/* Status */}
                     <td>
                       <div className="space-y-1">
                         {getVerificationBadge(user)}
                         {user.isDeleted && (
-                          <div className="badge badge-error gap-1">
-                            <FiUserX size={12} />
-                            Deleted
+                          <div className="badge badge-error badge-xs sm:badge-sm gap-1">
+                            <FiUserX size={8} className="sm:w-3 sm:h-3" />
+                            <span className="text-[10px] sm:text-xs">Deleted</span>
                           </div>
                         )}
                       </div>
                     </td>
 
-                    {/* User Joined: creation date formatted */}
-                    <td>
-                      <div className="flex items-center gap-1 text-sm">
-                        <FiCalendar size={12} className="text-base-content/50" />
+                    {/* Joined - Hidden on tablet */}
+                    <td className="hidden lg:table-cell">
+                      <div className="flex items-center gap-1 text-xs sm:text-sm">
+                        <FiCalendar size={10} className="sm:w-3 sm:h-3 text-base-content/50" />
                         <span>{formatDate(user.createdAt)}</span>
                       </div>
                     </td>
 
-                    {/* Actions: view, edit, delete buttons */}
+                    {/* Actions */}
                     <td>
                       {canManageThisUser ? (
                         <div className="flex justify-center gap-1">
-                          {/* View button - opens detail modal */}
+                          {/* View Button */}
                           <button
                             onClick={() => {
                               setSelectedUserId(user?._id);
                               document.getElementById('view_user_modal')?.showModal();
                             }}
-                            className="btn btn-ghost btn-sm btn-square tooltip"
+                            className="btn btn-ghost btn-xs sm:btn-sm btn-square tooltip"
                             data-tip="View"
                             disabled={isDeleting || isExporting}
                           >
-                            <FiEye size={16} />
+                            <FiEye size={12} className="sm:w-4 sm:h-4" />
                           </button>
 
-                          {/* Edit button - opens edit modal */}
+                          {/* Edit Button */}
                           <button
                             onClick={() => {
                               setSelectedUserId(user?._id);
                               document.getElementById('edit_user_modal')?.showModal();
                             }}
-                            className="btn btn-ghost btn-sm btn-square tooltip"
+                            className="btn btn-ghost btn-xs sm:btn-sm btn-square tooltip"
                             data-tip="Edit"
                             disabled={isDeleting || isExporting}
                           >
-                            <FiEdit2 size={16} />
+                            <FiEdit2 size={12} className="sm:w-4 sm:h-4" />
                           </button>
 
-
-
-                          {/* Delete button - triggers delete confirmation */}
+                          {/* Delete Button */}
                           <button
                             onClick={() => handleDeleteUser(user._id, userName, user.role)}
-                            className="btn btn-ghost btn-sm btn-square text-error tooltip"
+                            className="btn btn-ghost btn-xs sm:btn-sm btn-square text-error tooltip"
                             data-tip="Delete"
                             disabled={isDeleting || isExporting}
                           >
-                            <FiTrash2 size={16} />
+                            <FiTrash2 size={12} className="sm:w-4 sm:h-4" />
                           </button>
                         </div>
                       ) : (
                         <div className="flex justify-center">
-                          <span className="badge badge-ghost">Protected</span>
+                          <span className="badge badge-ghost badge-xs sm:badge-sm">Protected</span>
                         </div>
                       )}
                     </td>
@@ -808,17 +884,17 @@ const UsersManagement = () => {
                 );
               })
             ) : (
-              // Empty state with animation
+              // Empty State
               <motion.tr
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.4 }}
               >
-                <td colSpan={9} className="text-center py-12">
+                <td colSpan={9} className="text-center py-8 sm:py-12">
                   <div className="flex flex-col items-center gap-2">
-                    <FiUsers size={48} className="text-base-content/30" />
-                    <h3 className="text-lg font-semibold text-base-content/70">No users found</h3>
-                    <p className="text-sm text-base-content/50">
+                    <FiUsers size={32} className="sm:w-12 sm:h-12 text-base-content/30" />
+                    <h3 className="text-sm sm:text-base font-semibold text-base-content/70">No users found</h3>
+                    <p className="text-xs sm:text-sm text-base-content/50">
                       Try adjusting your filters or search term
                     </p>
                   </div>
@@ -829,13 +905,9 @@ const UsersManagement = () => {
         </table>
       </motion.div>
 
-      {/* Pagination with Fade In */}
+      {/* ==================== PAGINATION ==================== */}
       {filteredUsers.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
+        <motion.div variants={fadeInUp}>
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -844,43 +916,43 @@ const UsersManagement = () => {
         </motion.div>
       )}
 
-      {/* Add User Modal - dialog with backdrop click close */}
+      {/* ==================== MODALS ==================== */}
+
+      {/* Add User Modal */}
       <dialog id="add_user_modal" className="modal">
         <AddUserModal
-          onClose={() => CloseModal()}
+          onClose={CloseModal}
           refreshUsers={() => usersRefetch()}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
 
-      {/* Edit User Modal - dialog with backdrop click close */}
+      {/* Edit User Modal */}
       <dialog id="edit_user_modal" className="modal">
         <EditUserModal
           userId={selectedUserId}
-          onClose={() => CloseModal()}
+          onClose={CloseModal}
           refreshUsers={() => usersRefetch()}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
 
-      {/* View User Modal - dialog with backdrop click close */}
+      {/* View User Modal */}
       <dialog id="view_user_modal" className="modal">
         <ViewUserModal
           userId={selectedUserId}
-          onClose={() => CloseModal()}
+          onClose={CloseModal}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
-    </div>
+    </motion.div>
   );
 };
 
 export default UsersManagement;
-
-

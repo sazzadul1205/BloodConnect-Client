@@ -52,11 +52,88 @@ import ResultsCount from "../../../../shared/ResultsCount";
 // Date formatting
 import { format, formatDistanceToNow } from "date-fns";
 
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  auditLogs: (params) => ['audit-logs', params],
+  auditSummary: ['audit-summary'],
+  auditStats: ['audit-stats'],
+};
+
+// ==================== CONSTANTS ====================
+
+/**
+ * Action configuration for different log actions
+ * Each action has an icon, color, and label
+ */
+const actionConfig = {
+  UPDATE: { icon: FiEdit2, color: "info", label: "Update" },
+  LOGIN: { icon: FiLogIn, color: "success", label: "Login" },
+  DELETE: { icon: FiTrash2, color: "error", label: "Delete" },
+  REJECT: { icon: FiXCircle, color: "error", label: "Reject" },
+  LOGOUT: { icon: FiLogOut, color: "warning", label: "Logout" },
+  default: { icon: FiActivity, color: "ghost", label: "Action" },
+  CREATE: { icon: FiPlusCircle, color: "success", label: "Create" },
+  VERIFY: { icon: FiCheckCircle, color: "success", label: "Verify" },
+  APPROVE: { icon: FiCheckCircle, color: "success", label: "Approve" },
+};
+
+/**
+ * Resource configuration for different resource types
+ */
+const resourceConfig = {
+  User: { icon: FiUsers, color: "primary" },
+  Admin: { icon: FiShield, color: "error" },
+  Donor: { icon: FiUser, color: "success" },
+  default: { icon: FiServer, color: "ghost" },
+  Hospital: { icon: FiServer, color: "info" },
+  Request: { icon: FiActivity, color: "warning" },
+  BloodBank: { icon: FiServer, color: "secondary" },
+};
+
+// ==================== ANIMATION VARIANTS ====================
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const tableRowVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: (custom) => ({
+    opacity: 1,
+    x: 0,
+    transition: {
+      delay: 0.25 + custom * 0.02,
+      duration: 0.3
+    }
+  })
+};
+
+// ==================== MAIN COMPONENT ====================
+
+/**
+ * Audit Logs Component
+ * Displays system audit logs with filtering, search, and statistics
+ * 
+ * @returns {JSX.Element} Audit logs management page
+ */
 const AuditLogs = () => {
   const { axiosInstance } = useAxiosPublic();
   const token = localStorage.getItem("auth_token");
 
-  // Pagination and filter states
+  // ==================== STATE MANAGEMENT ====================
+
   const [sortBy] = useState("timestamp");
   const [endDate, setEndDate] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -71,31 +148,11 @@ const AuditLogs = () => {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [selectedResource, setSelectedResource] = useState("");
 
-  // Action icons and colors mapping
-  const actionConfig = {
-    UPDATE: { icon: FiEdit2, color: "info", label: "Update" },
-    LOGIN: { icon: FiLogIn, color: "success", label: "Login" },
-    DELETE: { icon: FiTrash2, color: "error", label: "Delete" },
-    REJECT: { icon: FiXCircle, color: "error", label: "Reject" },
-    LOGOUT: { icon: FiLogOut, color: "warning", label: "Logout" },
-    default: { icon: FiActivity, color: "ghost", label: "Action" },
-    CREATE: { icon: FiPlusCircle, color: "success", label: "Create" },
-    VERIFY: { icon: FiCheckCircle, color: "success", label: "Verify" },
-    APPROVE: { icon: FiCheckCircle, color: "success", label: "Approve" },
-  };
+  // ==================== TANSTACK QUERIES ====================
 
-  // Resource icons mapping
-  const resourceConfig = {
-    User: { icon: FiUsers, color: "primary" },
-    Admin: { icon: FiShield, color: "error" },
-    Donor: { icon: FiUser, color: "success" },
-    default: { icon: FiServer, color: "ghost" },
-    Hospital: { icon: FiServer, color: "info" },
-    Request: { icon: FiActivity, color: "warning" },
-    BloodBank: { icon: FiServer, color: "secondary" },
-  };
-
-  // 🔹 Fetch Audit Logs (Base route: /)
+  /**
+   * Query 1: Fetch Audit Logs with filters and pagination
+   */
   const {
     data: auditData,
     isLoading: loadingLogs,
@@ -103,7 +160,17 @@ const AuditLogs = () => {
     error: logsErrorData,
     refetch: refetchLogs,
   } = useQuery({
-    queryKey: ["audit-logs", currentPage, itemsPerPage, sortBy, sortOrder, selectedAction, selectedResource, selectedUserId, startDate, endDate],
+    queryKey: queryKeys.auditLogs({
+      page: currentPage,
+      limit: itemsPerPage,
+      sortBy,
+      sortOrder,
+      selectedAction,
+      selectedResource,
+      selectedUserId,
+      startDate,
+      endDate,
+    }),
     queryFn: async () => {
       const params = new URLSearchParams({
         page: currentPage,
@@ -122,9 +189,12 @@ const AuditLogs = () => {
       });
       return res.data;
     },
+    staleTime: 1 * 60 * 1000, // 1 minute
   });
 
-  // 🔹 Fetch Dashboard Summary (/dashboard/summary)
+  /**
+   * Query 2: Fetch Dashboard Summary
+   */
   const {
     data: summaryData,
     isLoading: loadingSummary,
@@ -132,16 +202,19 @@ const AuditLogs = () => {
     error: summaryErrorData,
     refetch: refetchSummary,
   } = useQuery({
-    queryKey: ["audit-summary"],
+    queryKey: queryKeys.auditSummary,
     queryFn: async () => {
       const res = await axiosInstance.get("/audit-logs/dashboard/summary", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // 🔹 Fetch Action Statistics (/stats/actions)
+  /**
+   * Query 3: Fetch Action Statistics
+   */
   const {
     data: statsData,
     isLoading: loadingStats,
@@ -149,7 +222,7 @@ const AuditLogs = () => {
     error: statsErrorData,
     refetch: refetchStats,
   } = useQuery({
-    queryKey: ["audit-stats"],
+    queryKey: queryKeys.auditStats,
     queryFn: async () => {
       const res = await axiosInstance.get("/audit-logs/stats/actions", {
         headers: { Authorization: `Bearer ${token}` },
@@ -157,9 +230,20 @@ const AuditLogs = () => {
       return res.data;
     },
     enabled: viewMode === "stats",
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  // Format timestamp
+  // ==================== COMPUTED VALUES ====================
+
+  const logs = auditData?.data || [];
+  const pagination = auditData?.pagination || { totalCount: 0, totalPages: 1 };
+  const summary = summaryData?.data || null;
+
+  // ==================== HELPER FUNCTIONS ====================
+
+  /**
+   * Format timestamp into full, relative, date, and time formats
+   */
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return "N/A";
     const date = new Date(timestamp);
@@ -171,35 +255,42 @@ const AuditLogs = () => {
     };
   };
 
-  // Get action badge
+  /**
+   * Get action badge with appropriate icon and color
+   */
   const getActionBadge = (action) => {
     const config = actionConfig[action?.toUpperCase()] || actionConfig.default;
     const Icon = config.icon;
 
     return (
-      <div className={`badge badge-${config.color} gap-1`}>
-        <Icon size={12} />
-        {config.label}
+      <div className={`badge badge-${config.color} badge-xs sm:badge-sm gap-1`}>
+        <Icon size={8} className="sm:w-3 sm:h-3" />
+        <span className="text-[10px] sm:text-xs">{config.label}</span>
       </div>
     );
   };
 
-  // Get resource badge
+  /**
+   * Get resource badge with icon
+   */
   const getResourceBadge = (resource) => {
     const config = resourceConfig[resource] || resourceConfig.default;
     const Icon = config.icon;
 
     return (
-      <div className="badge badge-outline gap-1">
-        <Icon size={12} />
-        {resource}
+      <div className="badge badge-outline badge-xs sm:badge-sm gap-1">
+        <Icon size={8} className="sm:w-3 sm:h-3" />
+        <span className="text-[10px] sm:text-xs">{resource}</span>
       </div>
     );
   };
 
-  // Handle export button click - FIXED
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Handle export button click
+   */
   const handleExport = () => {
-    // Prepare filters for metadata
     const filters = {
       action: selectedAction,
       resource: selectedResource,
@@ -209,12 +300,12 @@ const AuditLogs = () => {
       searchTerm,
       viewMode
     };
-
-    // Show export options modal with current logs and filters
     showExportOptions(logs, filters, setIsExporting);
   };
 
-  // Handle search
+  /**
+   * Handle search
+   */
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       refetchLogs();
@@ -237,8 +328,6 @@ const AuditLogs = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Update the data with search results
-      // You might want to set this to a separate state, but for now we'll just refetch
       if (res.data) {
         refetchLogs();
       }
@@ -248,8 +337,10 @@ const AuditLogs = () => {
         title: "Error!",
         text: "Failed to search audit logs",
         icon: "error",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           title: "text-lg font-bold text-error",
           confirmButton: "btn btn-sm btn-error text-white",
         },
@@ -258,7 +349,9 @@ const AuditLogs = () => {
     }
   };
 
-  // Handle clear filters
+  /**
+   * Clear all filters
+   */
   const clearFilters = () => {
     setSearchTerm("");
     setSelectedAction("");
@@ -269,34 +362,16 @@ const AuditLogs = () => {
     setCurrentPage(1);
   };
 
-  // Toggle log expansion
+  /**
+   * Toggle log expansion for details view
+   */
   const toggleLogExpansion = (logId) => {
     setExpandedLogId(expandedLogId === logId ? null : logId);
   };
 
-  // Reset pagination when filters change
-  React.useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedAction, selectedResource, selectedUserId, startDate, endDate, searchTerm]);
-
-  // Loading state
-  if (loadingLogs || loadingSummary || loadingStats) return <BloodLoader />;
-
-  // Error state
-  if (logsError || summaryError || statsError) {
-    return (
-      <ErrorState
-        error={[logsErrorData, summaryErrorData, statsErrorData]}
-        onRetry={() => refetchLogs() && refetchSummary() && refetchStats()}
-      />
-    );
-  }
-
-  const logs = auditData?.data || [];
-  const pagination = auditData?.pagination || { totalCount: 0, totalPages: 1 };
-  const summary = summaryData?.data || null;
-
-  // Handle reset all logs
+  /**
+   * Handle reset all logs (dangerous action)
+   */
   const handleResetLogs = async () => {
     const result = await Swal.fire({
       title: "Are you sure?",
@@ -305,8 +380,10 @@ const AuditLogs = () => {
       showCancelButton: true,
       confirmButtonText: "Yes, delete all",
       cancelButtonText: "Cancel",
+      background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+      color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
       customClass: {
-        popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+        popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
         title: "text-lg font-bold text-warning",
         confirmButton: "btn btn-sm btn-error text-white",
         cancelButton: "btn btn-sm",
@@ -316,7 +393,6 @@ const AuditLogs = () => {
 
     if (result.isConfirmed) {
       try {
-        // Call your API endpoint to delete logs
         await axiosInstance.delete("/audit-logs", {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -327,12 +403,14 @@ const AuditLogs = () => {
           icon: "success",
           timer: 2000,
           showConfirmButton: false,
+          background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+          color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
           customClass: {
-            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           },
+          buttonsStyling: false,
         });
 
-        // Refresh the list
         refetchLogs();
       } catch (error) {
         console.error("Error resetting logs:", error);
@@ -340,8 +418,10 @@ const AuditLogs = () => {
           title: "Error!",
           text: "Failed to delete audit logs.",
           icon: "error",
+          background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+          color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
           customClass: {
-            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
             title: "text-lg font-bold text-error",
             confirmButton: "btn btn-sm btn-error text-white",
           },
@@ -351,196 +431,201 @@ const AuditLogs = () => {
     }
   };
 
+  // Reset pagination when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedAction, selectedResource, selectedUserId, startDate, endDate, searchTerm]);
+
+  // ==================== LOADING & ERROR STATES ====================
+
+  if (loadingLogs || loadingSummary || loadingStats) return <BloodLoader />;
+
+  if (logsError || summaryError || statsError) {
+    return (
+      <ErrorState
+        error={[logsErrorData, summaryErrorData, statsErrorData]}
+        onRetry={() => {
+          refetchLogs();
+          refetchSummary();
+          refetchStats();
+        }}
+      />
+    );
+  }
+
+  // ==================== RENDER ====================
+
   return (
-    // Page shell: full-height admin audit surface with neutral background and consistent padding.
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section with Fade In */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={staggerContainer}
+      className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6"
+    >
+
+      {/* ==================== HEADER SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6"
+        variants={fadeInUp}
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
       >
-        {/* Header copy: communicates context and purpose of the audit logs dashboard. */}
+        {/* Title and description */}
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            {/* Visual identity icon for audit/logging system. */}
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <FaHistory className="text-error" />
             Audit Logs
-          </h2>
-          <p className="text-base-content/70 text-sm mt-1">
+          </h1>
+          <p className="text-xs sm:text-sm text-base-content/70 mt-1">
             Track and monitor all system activities and user actions
           </p>
         </div>
 
-        {/* Toolbar: view toggle + export + reset utility actions. */}
-        <div className="flex gap-2">
-          {/* View Mode Toggle: switches between list view and statistics view. */}
+        {/* Toolbar */}
+        <div className="flex flex-wrap gap-2">
+          {/* View Mode Toggle */}
           <div className="join">
             <button
               onClick={() => setViewMode("list")}
-              className={`join-item btn btn-sm ${viewMode === "list" ? "btn-error" : "btn-outline"}`}
+              className={`join-item btn btn-xs sm:btn-sm ${viewMode === "list" ? "btn-error" : "btn-outline"}`}
             >
-              <FiActivity size={16} />
-              List
+              <FiActivity size={12} className="sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline ml-1">List</span>
             </button>
             <button
               onClick={() => setViewMode("stats")}
-              className={`join-item btn btn-sm ${viewMode === "stats" ? "btn-error" : "btn-outline"}`}
+              className={`join-item btn btn-xs sm:btn-sm ${viewMode === "stats" ? "btn-error" : "btn-outline"}`}
             >
-              <FiBarChart2 size={16} />
-              Stats
+              <FiBarChart2 size={12} className="sm:w-4 sm:h-4" />
+              <span className="hidden xs:inline ml-1">Stats</span>
             </button>
           </div>
 
-          {/* Export Button with Count: exports current filtered log set with item count. */}
+          {/* Export Button */}
           <button
             onClick={handleExport}
-            className="btn btn-outline btn-sm gap-2"
+            className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2"
             disabled={isExporting || logs.length === 0}
           >
             {isExporting ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
-                Exporting...
+                <span className="loading loading-spinner loading-xs"></span>
+                <span className="text-xs sm:text-sm">Exporting...</span>
               </>
             ) : (
               <>
-                <FiDownload size={16} />
-                Export ({logs.length})
+                <FiDownload size={12} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">Export ({logs.length})</span>
               </>
             )}
           </button>
 
-          {/* Reset All Logs Button: destructive action to clear entire audit trail. */}
+          {/* Reset Logs Button */}
           <button
             onClick={handleResetLogs}
-            className="btn btn-error btn-sm gap-2"
+            className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2"
           >
-            <FiTrash2 size={16} />
-            Reset Logs
+            <FiTrash2 size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">Reset Logs</span>
           </button>
         </div>
       </motion.div>
 
-      {/* Dashboard Summary Cards with Staggered Fade In */}
+      {/* ==================== DASHBOARD SUMMARY CARDS ==================== */}
       {summary && (
         <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: { opacity: 0 },
-            visible: {
-              opacity: 1,
-              transition: {
-                staggerChildren: 0.1 // Each card fades in sequentially with 0.1s delay
-              }
-            }
-          }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6"
+          variants={staggerContainer}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
         >
-          {/* Card 1: Today's Activity - immediate operational pulse. */}
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, y: 20 },
-              visible: { opacity: 1, y: 0 }
-            }}
-            transition={{ duration: 0.4 }}
-            className="stat bg-base-100 rounded-lg shadow-lg p-4"
-          >
-            {/* KPI icon area with brand-consistent error color. */}
-            <div className="stat-figure text-error">
-              <FiActivity size={24} />
+          {/* Today's Activity Card */}
+          <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="stat-title text-xs sm:text-sm opacity-70">Today's Activity</p>
+                <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-error">
+                  {summary.activity?.today || 0}
+                </p>
+              </div>
+              <div className="stat-figure bg-error/10 p-2 rounded-full">
+                <FiActivity className="text-error text-sm sm:text-base" />
+              </div>
             </div>
-            {/* KPI label. */}
-            <p className="stat-title">Today's Activity</p>
-            {/* KPI primary numeric value. */}
-            <p className="stat-value text-3xl">{summary.activity?.today || 0}</p>
-            {/* Secondary context line. */}
-            <p className="stat-desc">Actions performed today</p>
+            <p className="stat-desc text-xs mt-2">Actions performed today</p>
           </motion.div>
 
-          {/* Card 2: This Week - weekly trend indicator. */}
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, y: 20 },
-              visible: { opacity: 1, y: 0 }
-            }}
-            transition={{ duration: 0.4 }}
-            className="stat bg-base-100 rounded-lg shadow-lg p-4"
-          >
-            <div className="stat-figure text-info">
-              <FiCalendar size={24} />
+          {/* This Week Card */}
+          <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="stat-title text-xs sm:text-sm opacity-70">This Week</p>
+                <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-info">
+                  {summary.activity?.thisWeek || 0}
+                </p>
+              </div>
+              <div className="stat-figure bg-info/10 p-2 rounded-full">
+                <FiCalendar className="text-info text-sm sm:text-base" />
+              </div>
             </div>
-            <p className="stat-title">This Week</p>
-            <p className="stat-value text-3xl">{summary.activity?.thisWeek || 0}</p>
-            <p className="stat-desc">Last 7 days</p>
+            <p className="stat-desc text-xs mt-2">Last 7 days</p>
           </motion.div>
 
-          {/* Card 3: This Month - monthly volume snapshot. */}
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, y: 20 },
-              visible: { opacity: 1, y: 0 }
-            }}
-            transition={{ duration: 0.4 }}
-            className="stat bg-base-100 rounded-lg shadow-lg p-4"
-          >
-            <div className="stat-figure text-success">
-              <FiTrendingUp size={24} />
+          {/* This Month Card */}
+          <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="stat-title text-xs sm:text-sm opacity-70">This Month</p>
+                <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-success">
+                  {summary.activity?.thisMonth || 0}
+                </p>
+              </div>
+              <div className="stat-figure bg-success/10 p-2 rounded-full">
+                <FiTrendingUp className="text-success text-sm sm:text-base" />
+              </div>
             </div>
-            <p className="stat-title">This Month</p>
-            <p className="stat-value text-3xl">{summary.activity?.thisMonth || 0}</p>
-            <p className="stat-desc">Last 30 days</p>
+            <p className="stat-desc text-xs mt-2">Last 30 days</p>
           </motion.div>
 
-          {/* Card 4: Total Logs - all-time record count. */}
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, y: 20 },
-              visible: { opacity: 1, y: 0 }
-            }}
-            transition={{ duration: 0.4 }}
-            className="stat bg-base-100 rounded-lg shadow-lg p-4"
-          >
-            <div className="stat-figure text-warning">
-              <FiServer size={24} />
+          {/* Total Logs Card */}
+          <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="stat-title text-xs sm:text-sm opacity-70">Total Logs</p>
+                <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-warning">
+                  {summary.summary?.totalLogs || 0}
+                </p>
+              </div>
+              <div className="stat-figure bg-warning/10 p-2 rounded-full">
+                <FiServer className="text-warning text-sm sm:text-base" />
+              </div>
             </div>
-            <p className="stat-title">Total Logs</p>
-            <p className="stat-value text-3xl">{summary.summary?.totalLogs || 0}</p>
-            <p className="stat-desc">All time records</p>
+            <p className="stat-desc text-xs mt-2">All time records</p>
           </motion.div>
         </motion.div>
       )}
 
-      {/* Filters Section with Fade In */}
+      {/* ==================== FILTERS SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.1 }}
-        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4 mb-6"
+        variants={fadeInUp}
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-3 sm:p-4"
       >
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search input: free-text search across actions, resources, and changes. */}
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
+
+          {/* Search Input */}
           <div className="flex-1">
             <div className="form-control">
-              <div className="input-group">
-                <input
-                  type="text"
-                  placeholder="Search actions, resources, or changes..."
-                  className="input input-bordered w-full"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                />
-              </div>
+              <input
+                type="text"
+                placeholder="Search actions, resources, or changes..."
+                className="input input-bordered input-sm sm:input-md w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+              />
             </div>
           </div>
 
-          {/* Action Filter: dropdown for CRUD + auth operation types. */}
+          {/* Action Filter */}
           <div className="w-full lg:w-40">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={selectedAction}
               onChange={(e) => setSelectedAction(e.target.value)}
             >
@@ -556,10 +641,10 @@ const AuditLogs = () => {
             </select>
           </div>
 
-          {/* Resource Filter: scopes to specific domain entity types. */}
+          {/* Resource Filter */}
           <div className="w-full lg:w-40">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={selectedResource}
               onChange={(e) => setSelectedResource(e.target.value)}
             >
@@ -573,12 +658,12 @@ const AuditLogs = () => {
             </select>
           </div>
 
-          {/* Date Range: start and end date pickers for temporal filtering. */}
+          {/* Date Range */}
           <div className="w-full lg:w-40">
             <input
               type="date"
               placeholder="Start Date"
-              className="input input-bordered w-full"
+              className="input input-bordered input-sm sm:input-md w-full"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
             />
@@ -587,16 +672,16 @@ const AuditLogs = () => {
             <input
               type="date"
               placeholder="End Date"
-              className="input input-bordered w-full"
+              className="input input-bordered input-sm sm:input-md w-full"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
             />
           </div>
 
-          {/* Sort Order: newest/oldest first toggle. */}
+          {/* Sort Order */}
           <div className="w-full lg:w-32">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
             >
@@ -605,24 +690,19 @@ const AuditLogs = () => {
             </select>
           </div>
 
-          {/* Clear Filters: resets all filter inputs to default. */}
+          {/* Clear Filters Button */}
           <button
-            className="btn btn-outline btn-square"
+            className="btn btn-outline btn-sm btn-square"
             onClick={clearFilters}
             title="Clear filters"
           >
-            <FiRefreshCw size={18} />
+            <FiRefreshCw size={14} className="sm:w-4 sm:h-4" />
           </button>
         </div>
       </motion.div>
 
-      {/* Results Count with Fade In: shows current range and total items. */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-        className="mb-4"
-      >
+      {/* ==================== RESULTS COUNT ==================== */}
+      <motion.div variants={fadeInUp}>
         <ResultsCount
           endIndex={Math.min(currentPage * itemsPerPage, pagination.totalCount)}
           startIndex={(currentPage - 1) * itemsPerPage + 1}
@@ -634,9 +714,10 @@ const AuditLogs = () => {
         />
       </motion.div>
 
-      {/* Content based on view mode with AnimatePresence for smooth transitions */}
+      {/* ==================== CONTENT (LIST OR STATS) ==================== */}
       <AnimatePresence mode="wait">
-        {/* List View: tabular audit log display with expandable details. */}
+
+        {/* ==================== LIST VIEW ==================== */}
         {viewMode === "list" && (
           <motion.div
             key="list-view"
@@ -644,21 +725,19 @@ const AuditLogs = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
             transition={{ duration: 0.3 }}
-            className="space-y-6"
+            className="space-y-4 sm:space-y-6"
           >
-            {/* Recent Activities Feed: latest actions from summary payload. */}
+            {/* Recent Activities Feed */}
             {summary?.recentActivities && summary.recentActivities.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-                className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4"
+                variants={fadeInUp}
+                className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-3 sm:p-4"
               >
-                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                <h3 className="font-semibold text-sm sm:text-base mb-2 sm:mb-3 flex items-center gap-2">
                   <FiActivity className="text-error" />
                   Recent Activities
                 </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1 sm:gap-2">
                   {summary.recentActivities.slice(0, 5).map((activity, idx) => {
                     const timeAgo = formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true });
                     return (
@@ -667,12 +746,12 @@ const AuditLogs = () => {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.3, delay: 0.2 + idx * 0.05 }}
-                        className="badge badge-outline gap-1 p-3"
+                        className="badge badge-outline gap-1 p-2 sm:p-3 text-[10px] sm:text-xs"
                       >
                         <span className="font-semibold">{activity.userName || "System"}</span>
                         <span>{activity.action}</span>
                         <span>{activity.resource}</span>
-                        <span className="text-xs opacity-70">{timeAgo}</span>
+                        <span className="opacity-70 hidden xs:inline">{timeAgo}</span>
                       </motion.div>
                     );
                   })}
@@ -680,28 +759,24 @@ const AuditLogs = () => {
               </motion.div>
             )}
 
-            {/* Main Logs Table with Fade In */}
+            {/* Main Logs Table */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.25 }}
+              variants={fadeInUp}
               className="overflow-x-auto bg-base-100 rounded-lg shadow-lg border border-base-300"
             >
-              <table className="table table-zebra w-full">
-                {/* Table Header: column definitions for audit trail. */}
+              <table className="table table-xs sm:table-sm md:table-md w-full">
                 <thead>
                   <tr className="bg-base-200">
                     <th className="w-8"></th>
-                    <th>Timestamp</th>
-                    <th>User</th>
-                    <th>Action</th>
-                    <th>Resource</th>
-                    <th>IP Address</th>
-                    <th className="text-center">Actions</th>
+                    <th className="text-xs sm:text-sm">Timestamp</th>
+                    <th className="text-xs sm:text-sm hidden md:table-cell">User</th>
+                    <th className="text-xs sm:text-sm">Action</th>
+                    <th className="text-xs sm:text-sm">Resource</th>
+                    <th className="text-xs sm:text-sm hidden lg:table-cell">IP Address</th>
+                    <th className="text-xs sm:text-sm text-center">Actions</th>
                   </tr>
                 </thead>
 
-                {/* Table Body with staggered row animations */}
                 <tbody>
                   {logs.length > 0 ? (
                     logs.map((log, index) => {
@@ -710,73 +785,82 @@ const AuditLogs = () => {
 
                       return (
                         <React.Fragment key={log._id}>
-                          {/* Main row with hover expansion trigger */}
+                          {/* Main Row */}
                           <motion.tr
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.3, delay: 0.25 + index * 0.02 }}
+                            variants={tableRowVariants}
+                            custom={index}
+                            initial="hidden"
+                            animate="visible"
                             className="hover cursor-pointer"
                             onClick={() => toggleLogExpansion(log._id)}
                           >
                             <td>
                               <button className="btn btn-ghost btn-xs btn-square">
-                                {isExpanded ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+                                {isExpanded ?
+                                  <FiChevronUp size={12} className="sm:w-4 sm:h-4" /> :
+                                  <FiChevronDown size={12} className="sm:w-4 sm:h-4" />
+                                }
                               </button>
                             </td>
 
-                            {/* Timestamp cell with relative/absolute tooltip */}
+                            {/* Timestamp */}
                             <td>
                               <div className="tooltip" data-tip={timeFormatted.full}>
-                                <div className="flex items-center gap-1 text-sm">
-                                  <FiClock size={12} className="text-base-content/50" />
-                                  <span>{timeFormatted.relative}</span>
+                                <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                                  <FiClock size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
+                                  <span className="hidden xs:inline">{timeFormatted.relative}</span>
+                                  <span className="xs:hidden">{timeFormatted.time}</span>
                                 </div>
-                                <div className="text-xs text-base-content/50">
+                                <div className="text-[8px] sm:text-xs text-base-content/50 xs:hidden">
                                   {timeFormatted.time}
                                 </div>
                               </div>
                             </td>
 
-                            {/* User information with role badge */}
-                            <td>
+                            {/* User - Hidden on mobile */}
+                            <td className="hidden md:table-cell">
                               {log.user ? (
                                 <div>
-                                  <div className="font-medium text-sm">{log.user.name || "N/A"}</div>
-                                  <div className="text-xs text-base-content/50">{log.user.email}</div>
-                                  <div className="badge badge-xs badge-outline mt-1">{log.user.role}</div>
+                                  <div className="font-medium text-xs sm:text-sm truncate max-w-32">
+                                    {log.user.name || "N/A"}
+                                  </div>
+                                  <div className="text-[8px] sm:text-xs text-base-content/50 truncate max-w-32">
+                                    {log.user.email}
+                                  </div>
+                                  <div className="badge badge-xs mt-1">{log.user.role}</div>
                                 </div>
                               ) : (
-                                <div className="flex items-center gap-1 text-sm text-base-content/50">
-                                  <FiUser size={14} />
+                                <div className="flex items-center gap-1 text-xs sm:text-sm text-base-content/50">
+                                  <FiUser size={10} className="sm:w-3 sm:h-3" />
                                   System
                                 </div>
                               )}
                             </td>
 
-                            {/* Action with color-coded badge */}
+                            {/* Action */}
                             <td>{getActionBadge(log.action)}</td>
 
-                            {/* Resource type with truncated ID */}
+                            {/* Resource */}
                             <td>
                               <div className="flex items-center gap-2">
                                 {getResourceBadge(log.resource)}
                                 {log.resourceId && (
-                                  <span className="text-xs text-base-content/50">
+                                  <span className="text-[8px] sm:text-xs text-base-content/50 hidden xl:inline">
                                     ID: {log.resourceId.toString().slice(-6)}
                                   </span>
                                 )}
                               </div>
                             </td>
 
-                            {/* IP Address with globe icon */}
-                            <td>
-                              <div className="flex items-center gap-1 text-sm">
-                                <FiGlobe size={12} className="text-base-content/50" />
-                                <span>{log.ipAddress || "N/A"}</span>
+                            {/* IP Address - Hidden on tablet */}
+                            <td className="hidden lg:table-cell">
+                              <div className="flex items-center gap-1 text-xs sm:text-sm">
+                                <FiGlobe size={10} className="sm:w-3 sm:h-3 text-base-content/50" />
+                                <span className="truncate max-w-24">{log.ipAddress || "N/A"}</span>
                               </div>
                             </td>
 
-                            {/* Actions column with detail view button */}
+                            {/* Actions */}
                             <td className="text-center">
                               <button
                                 className="btn btn-ghost btn-xs btn-square tooltip"
@@ -786,12 +870,12 @@ const AuditLogs = () => {
                                   toggleLogExpansion(log._id);
                                 }}
                               >
-                                <FiEye size={14} />
+                                <FiEye size={12} className="sm:w-4 sm:h-4" />
                               </button>
                             </td>
                           </motion.tr>
 
-                          {/* Expanded Details Row with slide-down animation */}
+                          {/* Expanded Details Row */}
                           {isExpanded && (
                             <motion.tr
                               initial={{ opacity: 0, height: 0 }}
@@ -799,33 +883,28 @@ const AuditLogs = () => {
                               exit={{ opacity: 0, height: 0 }}
                               transition={{ duration: 0.3 }}
                             >
-                              <td colSpan={7} className="bg-base-200/50 p-4">
+                              <td colSpan={7} className="bg-base-200/50 p-3 sm:p-4">
                                 <motion.div
                                   initial={{ opacity: 0, y: -10 }}
                                   animate={{ opacity: 1, y: 0 }}
                                   transition={{ duration: 0.3, delay: 0.1 }}
                                   className="space-y-3"
                                 >
-                                  <h4 className="font-semibold flex items-center gap-2">
-                                    <FiActivity size={16} className="text-error" />
+                                  <h4 className="font-semibold text-xs sm:text-sm flex items-center gap-2">
+                                    <FiActivity size={12} className="sm:w-4 sm:h-4 text-error" />
                                     Audit Log Details
                                   </h4>
 
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {/* Basic Information Card */}
-                                    <motion.div
-                                      initial={{ opacity: 0, x: -10 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{ delay: 0.15 }}
-                                      className="bg-base-100 rounded-lg p-3 border border-base-300"
-                                    >
-                                      <h5 className="text-sm font-semibold mb-2 text-base-content/70">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                    {/* Basic Information */}
+                                    <div className="bg-base-100 rounded-lg p-3 border border-base-300">
+                                      <h5 className="text-[10px] sm:text-xs font-semibold mb-2 text-base-content/70">
                                         Basic Information
                                       </h5>
-                                      <div className="space-y-2 text-sm">
+                                      <div className="space-y-1 text-[8px] sm:text-xs">
                                         <div className="flex justify-between">
                                           <span className="text-base-content/50">Log ID:</span>
-                                          <span className="font-mono">{log._id}</span>
+                                          <span className="font-mono truncate max-w-32">{log._id}</span>
                                         </div>
                                         <div className="flex justify-between">
                                           <span className="text-base-content/50">Timestamp:</span>
@@ -842,31 +921,26 @@ const AuditLogs = () => {
                                         {log.resourceId && (
                                           <div className="flex justify-between">
                                             <span className="text-base-content/50">Resource ID:</span>
-                                            <span className="font-mono">{log.resourceId.toString()}</span>
+                                            <span className="font-mono truncate max-w-32">{log.resourceId.toString()}</span>
                                           </div>
                                         )}
                                       </div>
-                                    </motion.div>
+                                    </div>
 
-                                    {/* User Information Card */}
-                                    <motion.div
-                                      initial={{ opacity: 0, x: 10 }}
-                                      animate={{ opacity: 1, x: 0 }}
-                                      transition={{ delay: 0.2 }}
-                                      className="bg-base-100 rounded-lg p-3 border border-base-300"
-                                    >
-                                      <h5 className="text-sm font-semibold mb-2 text-base-content/70">
+                                    {/* User Information */}
+                                    <div className="bg-base-100 rounded-lg p-3 border border-base-300">
+                                      <h5 className="text-[10px] sm:text-xs font-semibold mb-2 text-base-content/70">
                                         User Information
                                       </h5>
                                       {log.user ? (
-                                        <div className="space-y-2 text-sm">
+                                        <div className="space-y-1 text-[8px] sm:text-xs">
                                           <div className="flex justify-between">
                                             <span className="text-base-content/50">Name:</span>
-                                            <span>{log.user.name || "N/A"}</span>
+                                            <span className="truncate max-w-32">{log.user.name || "N/A"}</span>
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-base-content/50">Email:</span>
-                                            <span>{log.user.email}</span>
+                                            <span className="truncate max-w-32">{log.user.email}</span>
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-base-content/50">Role:</span>
@@ -874,30 +948,25 @@ const AuditLogs = () => {
                                           </div>
                                           <div className="flex justify-between">
                                             <span className="text-base-content/50">User ID:</span>
-                                            <span className="font-mono">{log.userId?.toString()}</span>
+                                            <span className="font-mono truncate max-w-32">{log.userId?.toString()}</span>
                                           </div>
                                         </div>
                                       ) : (
-                                        <div className="text-sm text-base-content/50">System Action</div>
+                                        <div className="text-[8px] sm:text-xs text-base-content/50">System Action</div>
                                       )}
-                                    </motion.div>
+                                    </div>
                                   </div>
 
-                                  {/* Changes Section - only shows if there are field changes */}
+                                  {/* Changes Section */}
                                   {log.changes && (
-                                    <motion.div
-                                      initial={{ opacity: 0, y: 10 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: 0.25 }}
-                                      className="bg-base-100 rounded-lg p-3 border border-base-300"
-                                    >
-                                      <h5 className="text-sm font-semibold mb-3 text-base-content/70">
+                                    <div className="bg-base-100 rounded-lg p-3 border border-base-300">
+                                      <h5 className="text-[10px] sm:text-xs font-semibold mb-2 text-base-content/70">
                                         Changes
                                       </h5>
                                       <div className="overflow-x-auto">
                                         <table className="table table-xs">
                                           <thead>
-                                            <tr>
+                                            <tr className="text-[8px] sm:text-xs">
                                               <th>Field</th>
                                               <th>Old Value</th>
                                               <th>New Value</th>
@@ -905,14 +974,14 @@ const AuditLogs = () => {
                                           </thead>
                                           <tbody>
                                             {Object.entries(log.changes).map(([field, value]) => (
-                                              <tr key={field}>
+                                              <tr key={field} className="text-[8px] sm:text-xs">
                                                 <td className="font-medium">{field}</td>
-                                                <td className="text-base-content/70">
+                                                <td className="text-base-content/70 wrap-break-word max-w-40">
                                                   {typeof value.old === "object"
                                                     ? JSON.stringify(value.old)
                                                     : String(value.old || "—")}
                                                 </td>
-                                                <td className="text-success">
+                                                <td className="text-success wrap-break-word max-w-40">
                                                   {typeof value.new === "object"
                                                     ? JSON.stringify(value.new)
                                                     : String(value.new || "—")}
@@ -922,7 +991,7 @@ const AuditLogs = () => {
                                           </tbody>
                                         </table>
                                       </div>
-                                    </motion.div>
+                                    </div>
                                   )}
                                 </motion.div>
                               </td>
@@ -932,17 +1001,17 @@ const AuditLogs = () => {
                       );
                     })
                   ) : (
-                    // Empty state with animation
+                    // Empty State
                     <motion.tr
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.3 }}
                     >
-                      <td colSpan={7} className="text-center py-12">
+                      <td colSpan={7} className="text-center py-8 sm:py-12">
                         <div className="flex flex-col items-center gap-2">
-                          <FaHistory size={48} className="text-base-content/30" />
-                          <h3 className="text-lg font-semibold text-base-content/70">No audit logs found</h3>
-                          <p className="text-sm text-base-content/50">
+                          <FaHistory size={32} className="sm:w-12 sm:h-12 text-base-content/30" />
+                          <h3 className="text-sm sm:text-base font-semibold text-base-content/70">No audit logs found</h3>
+                          <p className="text-xs sm:text-sm text-base-content/50">
                             Try adjusting your filters or date range
                           </p>
                         </div>
@@ -953,13 +1022,9 @@ const AuditLogs = () => {
               </table>
             </motion.div>
 
-            {/* Pagination with fade in */}
+            {/* Pagination */}
             {logs.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
+              <motion.div variants={fadeInUp}>
                 <Pagination
                   currentPage={currentPage}
                   totalPages={pagination.totalPages}
@@ -970,7 +1035,7 @@ const AuditLogs = () => {
           </motion.div>
         )}
 
-        {/* Statistics View: analytical charts and aggregations */}
+        {/* ==================== STATISTICS VIEW ==================== */}
         {viewMode === "stats" && (
           <motion.div
             key="stats-view"
@@ -978,110 +1043,100 @@ const AuditLogs = () => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.3 }}
-            className="space-y-6"
+            className="space-y-4 sm:space-y-6"
           >
             {loadingStats ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex justify-center py-12"
+                className="flex justify-center py-8 sm:py-12"
               >
                 <BloodLoader />
               </motion.div>
             ) : statsData?.data ? (
               <>
-                {/* Summary Cards with staggered animation */}
+                {/* Summary Stats Cards */}
                 <motion.div
-                  initial="hidden"
-                  animate="visible"
-                  variants={{
-                    hidden: { opacity: 0 },
-                    visible: {
-                      opacity: 1,
-                      transition: { staggerChildren: 0.1 }
-                    }
-                  }}
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                  variants={staggerContainer}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
                 >
                   {/* Total Actions Card */}
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                    className="stat bg-base-100 rounded-lg shadow-lg p-4"
-                  >
-                    <div className="stat-figure text-error">
-                      <FiActivity size={24} />
+                  <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="stat-title text-xs sm:text-sm opacity-70">Total Actions</p>
+                        <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-error">
+                          {statsData.data.totals?.[0]?.totalLogs || 0}
+                        </p>
+                      </div>
+                      <div className="stat-figure bg-error/10 p-2 rounded-full">
+                        <FiActivity className="text-error text-sm sm:text-base" />
+                      </div>
                     </div>
-                    <p className="stat-title">Total Actions</p>
-                    <p className="stat-value text-3xl">{statsData.data.totals?.[0]?.totalLogs || 0}</p>
-                    <p className="stat-desc">Last {statsData.data.period || 30} days</p>
+                    <p className="stat-desc text-xs mt-2">Last {statsData.data.period || 30} days</p>
                   </motion.div>
 
                   {/* Active Users Card */}
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                    className="stat bg-base-100 rounded-lg shadow-lg p-4"
-                  >
-                    <div className="stat-figure text-info">
-                      <FiUsers size={24} />
+                  <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="stat-title text-xs sm:text-sm opacity-70">Active Users</p>
+                        <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-info">
+                          {statsData.data.totals?.[0]?.uniqueUsers || 0}
+                        </p>
+                      </div>
+                      <div className="stat-figure bg-info/10 p-2 rounded-full">
+                        <FiUsers className="text-info text-sm sm:text-base" />
+                      </div>
                     </div>
-                    <p className="stat-title">Active Users</p>
-                    <p className="stat-value text-3xl">{statsData.data.totals?.[0]?.uniqueUsers || 0}</p>
-                    <p className="stat-desc">Unique users</p>
+                    <p className="stat-desc text-xs mt-2">Unique users</p>
                   </motion.div>
 
                   {/* Resources Card */}
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                    className="stat bg-base-100 rounded-lg shadow-lg p-4"
-                  >
-                    <div className="stat-figure text-success">
-                      <FiServer size={24} />
+                  <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="stat-title text-xs sm:text-sm opacity-70">Resources</p>
+                        <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-success">
+                          {statsData.data.totals?.[0]?.uniqueResources || 0}
+                        </p>
+                      </div>
+                      <div className="stat-figure bg-success/10 p-2 rounded-full">
+                        <FiServer className="text-success text-sm sm:text-base" />
+                      </div>
                     </div>
-                    <p className="stat-title">Resources</p>
-                    <p className="stat-value text-3xl">{statsData.data.totals?.[0]?.uniqueResources || 0}</p>
-                    <p className="stat-desc">Accessed resources</p>
+                    <p className="stat-desc text-xs mt-2">Accessed resources</p>
                   </motion.div>
 
                   {/* Action Types Card */}
-                  <motion.div
-                    variants={{
-                      hidden: { opacity: 0, y: 20 },
-                      visible: { opacity: 1, y: 0 }
-                    }}
-                    className="stat bg-base-100 rounded-lg shadow-lg p-4"
-                  >
-                    <div className="stat-figure text-warning">
-                      <FiTrendingUp size={24} />
+                  <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="stat-title text-xs sm:text-sm opacity-70">Action Types</p>
+                        <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-warning">
+                          {statsData.data.totals?.[0]?.uniqueActions || 0}
+                        </p>
+                      </div>
+                      <div className="stat-figure bg-warning/10 p-2 rounded-full">
+                        <FiTrendingUp className="text-warning text-sm sm:text-base" />
+                      </div>
                     </div>
-                    <p className="stat-title">Action Types</p>
-                    <p className="stat-value text-3xl">{statsData.data.totals?.[0]?.uniqueActions || 0}</p>
-                    <p className="stat-desc">Unique actions</p>
+                    <p className="stat-desc text-xs mt-2">Unique actions</p>
                   </motion.div>
                 </motion.div>
 
                 {/* Charts Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   {/* Actions by Type Chart */}
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
-                    className="bg-base-100 rounded-lg shadow-lg p-4"
+                    variants={fadeInUp}
+                    className="bg-base-100 rounded-lg shadow-lg p-3 sm:p-4"
                   >
-                    <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <h3 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4 flex items-center gap-2">
                       <FiActivity className="text-error" />
                       Actions by Type
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {statsData.data.byAction?.map((action, idx) => {
                         const config = actionConfig[action._id?.toUpperCase()] || actionConfig.default;
                         const Icon = config.icon;
@@ -1094,19 +1149,19 @@ const AuditLogs = () => {
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.25 + idx * 0.05 }}
-                            className="flex items-center gap-3"
+                            className="flex items-center gap-2 sm:gap-3"
                           >
-                            <div className={`badge badge-${config.color} gap-1 w-24`}>
-                              <Icon size={12} />
-                              {config.label}
+                            <div className={`badge badge-${config.color} badge-xs sm:badge-sm gap-1 w-16 sm:w-24`}>
+                              <Icon size={8} className="sm:w-3 sm:h-3" />
+                              <span className="text-[8px] sm:text-xs">{config.label}</span>
                             </div>
                             <div className="flex-1">
                               <div className="flex justify-between mb-1">
-                                <span className="text-sm">{action.count} actions</span>
-                                <span className="text-sm text-base-content/50">{percentage}%</span>
+                                <span className="text-[8px] sm:text-xs">{action.count} actions</span>
+                                <span className="text-[8px] sm:text-xs text-base-content/50">{percentage}%</span>
                               </div>
                               <progress
-                                className="progress progress-error w-full"
+                                className="progress progress-error w-full h-1.5 sm:h-2"
                                 value={action.count}
                                 max={total}
                               ></progress>
@@ -1119,16 +1174,14 @@ const AuditLogs = () => {
 
                   {/* Resources by Type Chart */}
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="bg-base-100 rounded-lg shadow-lg p-4"
+                    variants={fadeInUp}
+                    className="bg-base-100 rounded-lg shadow-lg p-3 sm:p-4"
                   >
-                    <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <h3 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4 flex items-center gap-2">
                       <FiServer className="text-info" />
                       Resources Accessed
                     </h3>
-                    <div className="space-y-3">
+                    <div className="space-y-2 sm:space-y-3">
                       {statsData.data.byResource?.map((resource, idx) => {
                         const total = statsData.data.totals?.[0]?.totalLogs || 1;
                         const percentage = ((resource.count / total) * 100).toFixed(1);
@@ -1139,18 +1192,18 @@ const AuditLogs = () => {
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: 0.35 + idx * 0.05 }}
-                            className="flex items-center gap-3"
+                            className="flex items-center gap-2 sm:gap-3"
                           >
-                            <div className="badge badge-outline w-24">
-                              {resource._id}
+                            <div className="badge badge-outline badge-xs sm:badge-sm w-16 sm:w-24">
+                              <span className="text-[8px] sm:text-xs">{resource._id}</span>
                             </div>
                             <div className="flex-1">
                               <div className="flex justify-between mb-1">
-                                <span className="text-sm">{resource.count} accesses</span>
-                                <span className="text-sm text-base-content/50">{percentage}%</span>
+                                <span className="text-[8px] sm:text-xs">{resource.count} accesses</span>
+                                <span className="text-[8px] sm:text-xs text-base-content/50">{percentage}%</span>
                               </div>
                               <progress
-                                className="progress progress-info w-full"
+                                className="progress progress-info w-full h-1.5 sm:h-2"
                                 value={resource.count}
                                 max={total}
                               ></progress>
@@ -1163,16 +1216,14 @@ const AuditLogs = () => {
 
                   {/* Activity by Hour Heatmap */}
                   <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    className="bg-base-100 rounded-lg shadow-lg p-4 lg:col-span-2"
+                    variants={fadeInUp}
+                    className="bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 lg:col-span-2"
                   >
-                    <h3 className="font-semibold mb-4 flex items-center gap-2">
+                    <h3 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4 flex items-center gap-2">
                       <FiClock className="text-warning" />
                       Activity by Hour
                     </h3>
-                    <div className="grid grid-cols-24 gap-1">
+                    <div className="grid grid-cols-24 gap-1 overflow-x-auto pb-2">
                       {Array.from({ length: 24 }, (_, hour) => {
                         const hourData = statsData.data.byHour?.find(h => h._id === hour);
                         const count = hourData?.count || 0;
@@ -1185,17 +1236,17 @@ const AuditLogs = () => {
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             transition={{ delay: 0.45 + hour * 0.01 }}
-                            className="flex flex-col items-center"
+                            className="flex flex-col items-center min-w-6"
                           >
                             <div className="tooltip" data-tip={`${count} actions at ${hour}:00`}>
-                              <div className="w-6 bg-base-200 rounded relative" style={{ height: "60px" }}>
+                              <div className="w-4 sm:w-6 bg-base-200 rounded relative" style={{ height: "40px", sm: { height: "60px" } }}>
                                 <div
                                   className="absolute bottom-0 w-full bg-error rounded"
                                   style={{ height: `${height}%` }}
                                 ></div>
                               </div>
                             </div>
-                            <span className="text-xs mt-1">{hour}</span>
+                            <span className="text-[8px] sm:text-xs mt-1">{hour}</span>
                           </motion.div>
                         );
                       })}
@@ -1205,19 +1256,17 @@ const AuditLogs = () => {
                   {/* Top Users Table */}
                   {statsData.data.topUsers && statsData.data.topUsers.length > 0 && (
                     <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="bg-base-100 rounded-lg shadow-lg p-4 lg:col-span-2"
+                      variants={fadeInUp}
+                      className="bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 lg:col-span-2"
                     >
-                      <h3 className="font-semibold mb-4 flex items-center gap-2">
+                      <h3 className="font-semibold text-sm sm:text-base mb-3 sm:mb-4 flex items-center gap-2">
                         <FiUsers className="text-success" />
                         Most Active Users
                       </h3>
                       <div className="overflow-x-auto">
-                        <table className="table table-sm">
+                        <table className="table table-xs sm:table-sm w-full">
                           <thead>
-                            <tr>
+                            <tr className="text-[8px] sm:text-xs">
                               <th>User</th>
                               <th>Role</th>
                               <th>Actions</th>
@@ -1235,17 +1284,24 @@ const AuditLogs = () => {
                                   initial={{ opacity: 0, x: -10 }}
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: 0.55 + idx * 0.03 }}
+                                  className="text-[8px] sm:text-xs"
                                 >
                                   <td>
                                     <div className="flex items-center gap-2">
-                                      <div className="avatar placeholder">
-                                        <div className="bg-error/10 text-error rounded-full w-8 h-8">
-                                          <span>{userStat.user?.name?.charAt(0) || "U"}</span>
+                                      <div className="avatar placeholder hidden xs:block">
+                                        <div className="bg-error/10 text-error rounded-full w-6 h-6 sm:w-8 sm:h-8">
+                                          <span className="text-[10px] sm:text-xs">
+                                            {userStat.user?.name?.charAt(0) || "U"}
+                                          </span>
                                         </div>
                                       </div>
                                       <div>
-                                        <div className="font-medium">{userStat.user?.name || "Unknown"}</div>
-                                        <div className="text-xs text-base-content/50">{userStat.user?.email}</div>
+                                        <div className="font-medium truncate max-w-24 sm:max-w-32">
+                                          {userStat.user?.name || "Unknown"}
+                                        </div>
+                                        <div className="text-[6px] sm:text-xs text-base-content/50 truncate max-w-24 sm:max-w-32">
+                                          {userStat.user?.email}
+                                        </div>
                                       </div>
                                     </div>
                                   </td>
@@ -1258,11 +1314,11 @@ const AuditLogs = () => {
                                   <td>
                                     <div className="flex items-center gap-2">
                                       <progress
-                                        className="progress progress-success w-20"
+                                        className="progress progress-success w-12 sm:w-20 h-1 sm:h-2"
                                         value={userStat.count}
                                         max={total}
                                       ></progress>
-                                      <span className="text-sm">{percentage}%</span>
+                                      <span className="text-[6px] sm:text-xs">{percentage}%</span>
                                     </div>
                                   </td>
                                 </motion.tr>
@@ -1280,17 +1336,17 @@ const AuditLogs = () => {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-center py-12"
+                className="text-center py-8 sm:py-12"
               >
-                <FiBarChart2 size={48} className="mx-auto text-base-content/30 mb-4" />
-                <h3 className="text-lg font-semibold">No statistics available</h3>
-                <p className="text-sm text-base-content/50">Try adjusting your filters</p>
+                <FiBarChart2 size={32} className="sm:w-12 sm:h-12 mx-auto text-base-content/30 mb-4" />
+                <h3 className="text-sm sm:text-base font-semibold">No statistics available</h3>
+                <p className="text-xs sm:text-sm text-base-content/50">Try adjusting your filters</p>
               </motion.div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };
 

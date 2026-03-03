@@ -5,7 +5,7 @@ const roleRoutes = {
   donor: "/donor/dashboard",
   hospital: "/hospital/dashboard",
   requester: "/requester/dashboard",
-  blood_bank: "/blood_bank/dashboard",
+  blood_bank: "/blood_bank/bank-profile",
   admin: "/admin/dashboard",
   super_admin: "/super_admin/dashboard",
 };

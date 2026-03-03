@@ -5,7 +5,7 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 
 // eslint-disable-next-line no-unused-vars
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Sweet Alert
 import Swal from "sweetalert2";
@@ -30,22 +30,111 @@ import {
 } from "react-icons/fa";
 
 // Hooks
-import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 import useAuth from "../../../../../hooks/useAuth";
+import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
+
+// Shared
 import BloodLoader from "../../../../../shared/BloodLoader";
 
+// ==================== CONSTANTS ====================
 
+/**
+ * Blood types for selection
+ */
+const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+/**
+ * All possible roles with their configurations
+ */
+const ALL_ROLES = [
+  {
+    value: "donor",
+    label: "Blood Donor",
+    icon: FaTint,
+    description: "User can donate blood",
+    color: "success"
+  },
+  {
+    value: "requester",
+    label: "Blood Requester",
+    icon: FaHeartbeat,
+    description: "User can request blood",
+    color: "warning"
+  },
+  {
+    value: "hospital",
+    label: "Hospital Staff",
+    icon: FaMapMarkerAlt,
+    description: "User represents a hospital",
+    color: "info"
+  },
+  {
+    value: "blood_bank",
+    label: "Blood Bank Staff",
+    icon: FaBuilding,
+    description: "User works at blood bank",
+    color: "secondary"
+  },
+  {
+    value: "admin",
+    label: "Administrator",
+    icon: FaShieldAlt,
+    description: "User has admin privileges",
+    color: "error"
+  },
+];
+
+// ==================== ANIMATION VARIANTS ====================
+
+const modalVariants = {
+  hidden: { opacity: 0, scale: 0.95, y: 20 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: "easeOut"
+    }
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.95,
+    y: 20,
+    transition: {
+      duration: 0.2,
+      ease: "easeIn"
+    }
+  }
+};
+
+const stepVariants = {
+  hidden: { opacity: 0, x: 20 },
+  visible: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -20 }
+};
+
+// ==================== MAIN COMPONENT ====================
+
+/**
+ * Add User Modal Component
+ * Multi-step form for creating new users with different roles
+ * 
+ * @param {Function} refreshUsers - Function to refresh the users list after successful creation
+ */
 const AddUserModal = ({ refreshUsers }) => {
   const { axiosInstance } = useAxiosPublic();
   const { user, loading: authLoading } = useAuth();
 
-  // States
+  // ==================== STATE MANAGEMENT ====================
+
   const [step, setStep] = useState(1);
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Form handling
+  // ==================== FORM HANDLING ====================
+
   const {
     register,
     handleSubmit,
@@ -64,42 +153,55 @@ const AddUserModal = ({ refreshUsers }) => {
     },
   });
 
-  // Watch form values
+  // Watch form values for dynamic UI updates
   const password = watch("password");
   const selectedRole = watch("role");
   const selectedBloodGroup = watch("bloodGroup");
 
-  // Constants
-  const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+  // ==================== COMPUTED VALUES ====================
 
-  // Roles
-  const allRoles = [
-    { value: "donor", label: "Blood Donor", icon: FaTint, description: "User can donate blood", color: "success" },
-    { value: "requester", label: "Blood Requester", icon: FaHeartbeat, description: "User can request blood", color: "warning" },
-    { value: "hospital", label: "Hospital Staff", icon: FaMapMarkerAlt, description: "User represents a hospital", color: "info" },
-    { value: "blood_bank", label: "Blood Bank Staff", icon: FaBuilding, description: "User works at blood bank", color: "secondary" },
-    { value: "admin", label: "Administrator", icon: FaShieldAlt, description: "User has admin privileges", color: "error" },
-  ];
-
-  // Filter roles based on current user
-  const roles = allRoles.filter(role => {
+  /**
+   * Filter roles based on current user's permissions
+   * Super admin can assign any role
+   * Admin cannot assign admin role
+   */
+  const roles = ALL_ROLES.filter(role => {
     if (user?.role === "super_admin") return true; // super admin can assign anything
     if (user?.role === "admin" && role.value === "admin") return false; // admin cannot assign admin
     return true; // everyone else can assign all non-admin roles
   });
 
-  // Close Modal Function
+  /**
+   * Calculate password strength
+   */
+  const getPasswordStrength = () => {
+    if (!password) return null;
+    if (password.length < 6) return "Weak";
+    if (password.length < 10) return "Medium";
+    return "Strong";
+  };
+
+  const passwordStrength = getPasswordStrength();
+
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Close modal and reset form
+   */
   const closeModal = () => {
     reset();
     setStep(1);
-    setApiError(""); // Clear any API errors
+    setApiError("");
     document.getElementById('add_user_modal').close();
   };
 
-  // Step Next handler
+  /**
+   * Validate and move to next step
+   */
   const nextStep = async () => {
-    setApiError(""); // Clear API error when moving to next step
+    setApiError("");
     let fieldsToValidate = [];
+
     if (step === 1) fieldsToValidate = ["fullName", "email", "phone"];
     if (step === 2) fieldsToValidate = ["bloodGroup", "role", "password"];
 
@@ -109,16 +211,20 @@ const AddUserModal = ({ refreshUsers }) => {
     }
   };
 
-  // Step Prev handler
+  /**
+   * Go to previous step
+   */
   const prevStep = () => {
-    setApiError(""); // Clear API error when going back
+    setApiError("");
     setStep(step - 1);
   };
 
-  // Submit handler
+  /**
+   * Form submission handler
+   */
   const onSubmit = async (data) => {
     setLoading(true);
-    setApiError(""); // Clear any previous API errors
+    setApiError("");
 
     const registerData = {
       email: data.email,
@@ -133,25 +239,23 @@ const AddUserModal = ({ refreshUsers }) => {
       const response = await axiosInstance.post("/auth/register", registerData);
 
       if (response.data.success) {
-        // Close modal and refresh after alert
         closeModal();
         refreshUsers();
 
-        // SweetAlert2 success with DaisyUI styling
         await Swal.fire({
           title: "User Created",
           text: "The user has been created successfully.",
           icon: "success",
+          background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+          color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
           customClass: {
-            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
-            title: "text-lg font-bold text-green-600",
-            content: "text-base text-base-content/80",
+            popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
+            title: "text-lg font-bold text-success",
+            content: "text-xs sm:text-sm text-base-content/80",
             confirmButton: "btn btn-sm btn-success",
           },
           buttonsStyling: false,
         });
-
-
       }
     } catch (error) {
       console.error("Failed to create user:", error);
@@ -163,70 +267,104 @@ const AddUserModal = ({ refreshUsers }) => {
 
   if (authLoading) return <BloodLoader fullscreen={false} />;
 
+  // ==================== RENDER ====================
+
   return (
-    <div className="modal-box w-11/12 max-w-2xl p-0 overflow-hidden bg-base-100">
-      {/* Header */}
-      <div className="bg-linear-to-r from-error to-error/80 p-6 text-white">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-3 rounded-full">
-              <FaUserPlus size={24} />
+    <motion.div
+      variants={modalVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="modal-box w-11/12 max-w-2xl p-0 overflow-hidden bg-base-100 mx-2 sm:mx-0"
+    >
+
+      {/* ==================== MODAL HEADER ==================== */}
+      <div className="bg-linear-to-r from-error to-error/80 p-4 sm:p-6 text-white">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+
+          {/* Title and icon */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-white/20 p-2 sm:p-3 rounded-full">
+              <FaUserPlus size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-2xl">Add New User</h3>
-              <p className="text-white/80 text-sm">Create a new user account</p>
+              <h2 className="font-bold text-lg sm:text-2xl">Add New User</h2>
+              <p className="text-white/80 text-xs sm:text-sm">Create a new user account</p>
             </div>
           </div>
+
+          {/* Close button */}
           <button
             onClick={closeModal}
-            className="btn btn-ghost btn-sm btn-circle text-white hover:bg-white/20"
+            className="btn btn-ghost btn-xs sm:btn-sm btn-circle text-white hover:bg-white/20 self-end sm:self-auto"
+            aria-label="Close modal"
           >
-            <FaTimes size={20} />
+            <FaTimes size={14} className="sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="px-6 pt-6">
-        <div className="steps steps-horizontal w-full">
-          <div className={`step ${step >= 1 ? "step-error" : ""}`}>Basic Info</div>
-          <div className={`step ${step >= 2 ? "step-error" : ""}`}>Role & Blood</div>
-          <div className={`step ${step >= 3 ? "step-error" : ""}`}>Review</div>
+      {/* ==================== PROGRESS STEPS ==================== */}
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+        <div className="steps steps-horizontal w-full overflow-x-auto pb-2 flex-nowrap">
+          <div className={`step step-xs sm:step-md ${step >= 1 ? "step-error" : ""}`}>Basic Info</div>
+          <div className={`step step-xs sm:step-md ${step >= 2 ? "step-error" : ""}`}>Role & Blood</div>
+          <div className={`step step-xs sm:step-md ${step >= 3 ? "step-error" : ""}`}>Review</div>
         </div>
       </div>
 
-      {/* Inline API Error Message */}
-      {apiError && (
-        <div className="px-6 pt-4">
-          <div className="alert alert-error shadow-lg">
-            <div className="flex items-center gap-2">
-              <FaExclamationCircle size={20} />
-              <span>{apiError}</span>
+      {/* ==================== API ERROR MESSAGE ==================== */}
+      <AnimatePresence>
+        {apiError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="px-4 sm:px-6 pt-4"
+          >
+            <div className="alert alert-error shadow-lg p-3 sm:p-4">
+              <div className="flex items-center gap-2">
+                <FaExclamationCircle size={16} className="sm:w-5 sm:h-5 shrink-0" />
+                <span className="text-xs sm:text-sm">{apiError}</span>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          {/* Step 1: Basic Information */}
+      <form
+        onSubmit={(e) => {
+          if (step !== 3) {
+            e.preventDefault();
+            return;
+          }
+          handleSubmit(onSubmit)(e);
+        }}
+      >
+        <div className="p-4 sm:p-6 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto">
+
+          {/* ==================== STEP 1: BASIC INFORMATION ==================== */}
           {step === 1 && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step1"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
+              {/* Full Name */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaUser className="text-error" /> Full Name
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaUser className="text-error" size={12} />
+                    Full Name
                   </span>
                 </label>
                 <input
                   type="text"
                   placeholder="Enter full name"
-                  className={`input input-bordered w-full ${errors.fullName ? "input-error" : ""}`}
+                  className={`input input-bordered input-sm sm:input-md w-full ${errors.fullName ? "input-error" : ""}`}
                   {...register("fullName", {
                     required: "Full name is required",
                     minLength: {
@@ -236,22 +374,24 @@ const AddUserModal = ({ refreshUsers }) => {
                   })}
                 />
                 {errors.fullName && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.fullName.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.fullName.message}</span>
                   </label>
                 )}
               </div>
 
+              {/* Email */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaEnvelope className="text-error" /> Email Address
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaEnvelope className="text-error" size={12} />
+                    Email Address
                   </span>
                 </label>
                 <input
                   type="email"
                   placeholder="user@example.com"
-                  className={`input input-bordered w-full ${errors.email ? "input-error" : ""}`}
+                  className={`input input-bordered input-sm sm:input-md w-full ${errors.email ? "input-error" : ""}`}
                   {...register("email", {
                     required: "Email is required",
                     pattern: {
@@ -261,22 +401,24 @@ const AddUserModal = ({ refreshUsers }) => {
                   })}
                 />
                 {errors.email && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.email.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.email.message}</span>
                   </label>
                 )}
               </div>
 
+              {/* Phone */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaPhone className="text-error" /> Phone Number
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaPhone className="text-error" size={12} />
+                    Phone Number
                   </span>
                 </label>
                 <input
                   type="tel"
                   placeholder="+1234567890"
-                  className={`input input-bordered w-full ${errors.phone ? "input-error" : ""}`}
+                  className={`input input-bordered input-sm sm:input-md w-full ${errors.phone ? "input-error" : ""}`}
                   {...register("phone", {
                     required: "Phone number is required",
                     pattern: {
@@ -286,30 +428,34 @@ const AddUserModal = ({ refreshUsers }) => {
                   })}
                 />
                 {errors.phone && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.phone.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.phone.message}</span>
                   </label>
                 )}
               </div>
             </motion.div>
           )}
 
-          {/* Step 2: Role & Blood Group */}
+          {/* ==================== STEP 2: ROLE & BLOOD GROUP ==================== */}
           {step === 2 && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step2"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
+              {/* Blood Type Selection */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaTint className="text-error" /> Blood Type
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaTint className="text-error" size={12} />
+                    Blood Type
                   </span>
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {bloodTypes.map((type) => (
+                <div className="grid grid-cols-2 xs:grid-cols-4 gap-2">
+                  {BLOOD_TYPES.map((type) => (
                     <label key={type} className="cursor-pointer">
                       <input
                         type="radio"
@@ -320,7 +466,7 @@ const AddUserModal = ({ refreshUsers }) => {
                         })}
                       />
                       <div
-                        className={`btn btn-sm w-full ${selectedBloodGroup === type
+                        className={`btn btn-xs sm:btn-sm w-full ${selectedBloodGroup === type
                           ? "btn-error text-white"
                           : "btn-outline btn-error"
                           }`}
@@ -331,16 +477,18 @@ const AddUserModal = ({ refreshUsers }) => {
                   ))}
                 </div>
                 {errors.bloodGroup && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.bloodGroup.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.bloodGroup.message}</span>
                   </label>
                 )}
               </div>
 
+              {/* Role Selection */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaUser className="text-error" /> User Role
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaUser className="text-error" size={12} />
+                    User Role
                   </span>
                 </label>
                 <div className="grid grid-cols-1 gap-2">
@@ -350,7 +498,7 @@ const AddUserModal = ({ refreshUsers }) => {
                     return (
                       <label
                         key={role.value}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${isSelected
+                        className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 cursor-pointer transition-all ${isSelected
                           ? `border-${role.color} bg-${role.color}/10`
                           : 'border-base-300 hover:border-error/50'
                           }`}
@@ -363,38 +511,40 @@ const AddUserModal = ({ refreshUsers }) => {
                             required: "Please select role",
                           })}
                         />
-                        <Icon className={`text-xl ${isSelected ? `text-${role.color}` : 'text-gray-400'}`} />
+                        <Icon className={`text-base sm:text-xl ${isSelected ? `text-${role.color}` : 'text-gray-400'}`} />
                         <div className="flex-1">
-                          <p className={`font-semibold ${isSelected ? `text-${role.color}` : ''}`}>
+                          <p className={`font-semibold text-xs sm:text-sm ${isSelected ? `text-${role.color}` : ''}`}>
                             {role.label}
                           </p>
-                          <p className="text-xs opacity-70">{role.description}</p>
+                          <p className="text-[10px] sm:text-xs opacity-70">{role.description}</p>
                         </div>
                         {isSelected && (
-                          <FaCheckCircle className={`text-${role.color}`} />
+                          <FaCheckCircle className={`text-${role.color} text-xs sm:text-sm`} />
                         )}
                       </label>
                     );
                   })}
                 </div>
                 {errors.role && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.role.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.role.message}</span>
                   </label>
                 )}
               </div>
 
+              {/* Password */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaLock className="text-error" /> Password
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaLock className="text-error" size={12} />
+                    Password
                   </span>
                 </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter password"
-                    className={`input input-bordered w-full pr-10 ${errors.password ? "input-error" : ""}`}
+                    className={`input input-bordered input-sm sm:input-md w-full pr-10 ${errors.password ? "input-error" : ""}`}
                     {...register("password", {
                       required: "Password is required",
                       minLength: {
@@ -410,81 +560,98 @@ const AddUserModal = ({ refreshUsers }) => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-error"
+                    className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2 text-base-content/50 hover:text-error"
                   >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                    {showPassword ? <FaEyeSlash size={14} className="sm:w-4 sm:h-4" /> : <FaEye size={14} className="sm:w-4 sm:h-4" />}
                   </button>
                 </div>
                 {errors.password && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.password.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.password.message}</span>
                   </label>
                 )}
               </div>
 
               {/* Password Strength Indicator */}
               {password && (
-                <div className="space-y-1">
+                <motion.div
+                  className="space-y-1"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
                   <div className="flex gap-1">
                     {[1, 2, 3].map((i) => (
                       <div
                         key={i}
-                        className={`h-1 flex-1 rounded ${password.length > i * 3 ? 'bg-error' : 'bg-base-300'
+                        className={`h-1 flex-1 rounded transition-all duration-300 ${passwordStrength === 'Strong'
+                          ? i <= 3 ? 'bg-success' : 'bg-base-300'
+                          : passwordStrength === 'Medium'
+                            ? i <= 2 ? 'bg-warning' : 'bg-base-300'
+                            : passwordStrength === 'Weak'
+                              ? i <= 1 ? 'bg-error' : 'bg-base-300'
+                              : 'bg-base-300'
                           }`}
                       />
                     ))}
                   </div>
-                  <p className="text-xs opacity-70">
-                    Password strength: {
-                      password.length < 6 ? 'Weak' :
-                        password.length < 10 ? 'Medium' : 'Strong'
-                    }
+                  <p className="text-[10px] sm:text-xs opacity-70">
+                    Password strength: <span className={
+                      passwordStrength === 'Strong' ? 'text-success' :
+                        passwordStrength === 'Medium' ? 'text-warning' :
+                          'text-error'
+                    }>{passwordStrength}</span>
                   </p>
-                </div>
+                </motion.div>
               )}
             </motion.div>
           )}
 
-          {/* Step 3: Review */}
+          {/* ==================== STEP 3: REVIEW ==================== */}
           {step === 3 && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step3"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
-              <div className="alert alert-info bg-info/10 border-info/20">
-                <FaCheckCircle className="text-info" />
-                <span className="text-white">Please review the user information before creating the account.</span>
+              <div className="alert alert-info bg-info/10 border-info/20 flex-col sm:flex-row gap-2 p-3 sm:p-4">
+                <FaCheckCircle className="text-info text-lg sm:text-xl shrink-0" />
+                <span className="text-xs sm:text-sm text-center sm:text-left">
+                  Please review the user information before creating the account.
+                </span>
               </div>
 
-              <div className="bg-base-200 rounded-lg p-4 space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
-                  <FaUser className="text-error" />
+              {/* Basic Information Summary */}
+              <div className="bg-base-200 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
+                <h4 className="font-semibold text-xs sm:text-sm flex items-center gap-2">
+                  <FaUser className="text-error" size={12} />
                   Basic Information
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3 text-[10px] sm:text-xs">
                   <div>
                     <p className="opacity-70">Full Name</p>
-                    <p className="font-medium">{watch("fullName")}</p>
+                    <p className="font-medium wrap-break-word">{watch("fullName")}</p>
                   </div>
                   <div>
                     <p className="opacity-70">Email</p>
-                    <p className="font-medium">{watch("email")}</p>
+                    <p className="font-medium wrap-break-word">{watch("email")}</p>
                   </div>
                   <div>
                     <p className="opacity-70">Phone</p>
-                    <p className="font-medium">{watch("phone")}</p>
+                    <p className="font-medium wrap-break-word">{watch("phone")}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-base-200 rounded-lg p-4 space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
-                  <FaTint className="text-error" />
+              {/* Role & Blood Type Summary */}
+              <div className="bg-base-200 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
+                <h4 className="font-semibold text-xs sm:text-sm flex items-center gap-2">
+                  <FaTint className="text-error" size={12} />
                   Role & Blood Type
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3 text-[10px] sm:text-xs">
                   <div>
                     <p className="opacity-70">Blood Type</p>
                     <p className="font-medium text-error">{watch("bloodGroup")}</p>
@@ -499,58 +666,73 @@ const AddUserModal = ({ refreshUsers }) => {
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="modal-action border-t border-base-300 p-4 bg-base-200/50">
-          <div className="flex justify-between w-full">
-            {step > 1 && (
+        {/* ==================== FOOTER ACTIONS ==================== */}
+        <div className="modal-action border-t border-base-300 bg-base-200/50 px-4 py-4">
+          <div className="flex flex-row items-center justify-between gap-3 w-full">
+
+            {/* LEFT SIDE - Previous */}
+            {step > 1 ? (
               <button
                 type="button"
                 onClick={prevStep}
-                className="btn btn-outline btn-error"
+                className="btn btn-outline btn-error btn-sm sm:btn-md w-1/2 sm:w-auto flex items-center gap-2"
               >
-                ← Previous
-              </button>
-            )}
-            {step < 3 ? (
-              <button
-                type="button"
-                onClick={nextStep}
-                className="btn btn-error text-white ml-auto"
-              >
-                Next →
+                <span>←</span>
+                <span>Previous</span>
               </button>
             ) : (
-              <div className="flex gap-2 ml-auto">
+              <div />
+            )}
+
+            {/* RIGHT SIDE - Cancel + Next / Submit */}
+            <div className="flex flex-col sm:flex-row gap-2 w-1/2 sm:w-auto sm:ml-auto">
+
+
+              {step < 3 ? (
                 <button
                   type="button"
-                  onClick={closeModal}
-                  className="btn btn-ghost"
+                  onClick={nextStep}
+                  className="btn btn-error text-white btn-sm sm:btn-md w-full sm:w-auto flex items-center justify-center gap-2"
                 >
-                  Cancel
+                  <span>Next</span>
+                  <span>→</span>
                 </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn btn-error text-white gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <span className="loading loading-spinner loading-sm"></span>
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <FaUserPlus />
-                      Create User
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+              ) : (
+                <>
+                  {/* Cancel */}
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={loading}
+                    className="btn btn-ghost btn-sm sm:btn-md w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed hidden md:block"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-error text-white btn-sm sm:btn-md w-full sm:w-auto flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs"></span>
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaUserPlus className="text-sm" />
+                        <span>Create User</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </form>
-    </div>
+    </motion.div>
   );
 };
 

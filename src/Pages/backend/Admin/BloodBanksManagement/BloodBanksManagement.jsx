@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router";
 
 // eslint-disable-next-line no-unused-vars
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Sweet Alert
 import Swal from "sweetalert2";
@@ -53,6 +53,78 @@ import EditBloodBankModal from "./EditBloodBankModal/EditBloodBankModal";
 // Utils
 import { showExportOptions } from "./BloodBanksExport";
 
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  allBloodBanks: ['all-blood-banks'],
+  lowInventoryAlerts: ['low-inventory-alerts'],
+};
+
+// ==================== CONSTANTS ====================
+
+/**
+ * Bank type configuration for consistent display
+ */
+const bankTypeConfig = {
+  government: {
+    color: "badge-primary",
+    icon: FaBuilding,
+    label: "Government",
+  },
+  private: {
+    color: "badge-secondary",
+    icon: FaBuilding,
+    label: "Private",
+  },
+  ngo: {
+    color: "badge-success",
+    icon: FaHeartbeat,
+    label: "NGO",
+  },
+  hospital: {
+    color: "badge-info",
+    icon: FaHospital,
+    label: "Hospital",
+  },
+};
+
+// ==================== ANIMATION VARIANTS ====================
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const tableRowVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: (custom) => ({
+    opacity: 1,
+    x: 0,
+    transition: {
+      delay: 0.3 + custom * 0.02,
+      duration: 0.3
+    }
+  })
+};
+
+// ==================== MAIN COMPONENT ====================
+
+/**
+ * Blood Banks Management Component
+ * Allows admin to manage all blood banks, view inventory, and verify facilities
+ * 
+ * @returns {JSX.Element} Blood banks management page
+ */
 const BloodBanksManagement = () => {
   const queryClient = useQueryClient();
   const { axiosInstance } = useAxiosPublic();
@@ -62,7 +134,8 @@ const BloodBanksManagement = () => {
   // Token
   const token = localStorage.getItem("auth_token");
 
-  // Pagination and filter states
+  // ==================== STATE MANAGEMENT ====================
+
   const [isExporting, setIsExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -73,31 +146,11 @@ const BloodBanksManagement = () => {
   const [showLowInventory, setShowLowInventory] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState("");
 
-  // Bank type configuration
-  const bankTypeConfig = {
-    government: {
-      color: "badge-primary",
-      icon: FaBuilding,
-      label: "Government",
-    },
-    private: {
-      color: "badge-secondary",
-      icon: FaBuilding,
-      label: "Private",
-    },
-    ngo: {
-      color: "badge-success",
-      icon: FaHeartbeat,
-      label: "NGO",
-    },
-    hospital: {
-      color: "badge-info",
-      icon: FaHospital,
-      label: "Hospital",
-    },
-  };
+  // ==================== TANSTACK QUERIES ====================
 
-  // 🔹 Fetch All Blood Banks
+  /**
+   * Query 1: Fetch All Blood Banks
+   */
   const {
     data: bloodBanksData,
     isLoading: loadingBanks,
@@ -105,16 +158,19 @@ const BloodBanksManagement = () => {
     error: banksErrorData,
     refetch: refetchBanks,
   } = useQuery({
-    queryKey: ["all-blood-banks"],
+    queryKey: queryKeys.allBloodBanks,
     queryFn: async () => {
       const res = await axiosInstance.get("/blood-banks", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // 🔹 Fetch Low Inventory Alerts
+  /**
+   * Query 2: Fetch Low Inventory Alerts
+   */
   const {
     data: lowInventoryData,
     isLoading: loadingLowInventory,
@@ -122,7 +178,7 @@ const BloodBanksManagement = () => {
     error: lowInventoryErrorData,
     refetch: refetchLowInventory,
   } = useQuery({
-    queryKey: ["low-inventory-alerts"],
+    queryKey: queryKeys.lowInventoryAlerts,
     queryFn: async () => {
       const res = await axiosInstance.get("/blood-banks/alerts/low-inventory", {
         headers: { Authorization: `Bearer ${token}` },
@@ -130,9 +186,14 @@ const BloodBanksManagement = () => {
       return res.data;
     },
     enabled: showLowInventory,
+    staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
-  // Delete mutation
+  // ==================== MUTATIONS ====================
+
+  /**
+   * Mutation: Delete blood bank
+   */
   const deleteMutation = useMutation({
     mutationFn: async (bankId) => {
       const response = await axiosInstance.delete(`/blood-banks/${bankId}`, {
@@ -141,12 +202,16 @@ const BloodBanksManagement = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["all-blood-banks"]);
+      queryClient.invalidateQueries({ queryKey: queryKeys.allBloodBanks });
     },
   });
 
-  // Filter banks
-  const getFilteredBanks = () => {
+  // ==================== COMPUTED VALUES ====================
+
+  /**
+   * Filter banks based on all filter criteria
+   */
+  const filteredBanks = React.useMemo(() => {
     if (!bloodBanksData?.data) return [];
 
     let filtered = bloodBanksData.data;
@@ -190,9 +255,12 @@ const BloodBanksManagement = () => {
     }
 
     return filtered;
-  };
+  }, [bloodBanksData, showLowInventory, lowInventoryData, searchTerm, selectedType, selectedCity, verificationStatus]);
 
-  const filteredBanks = getFilteredBanks();
+  // Get unique cities for filter
+  const uniqueCities = React.useMemo(() => {
+    return [...new Set(bloodBanksData?.data?.map(bank => bank.address?.city).filter(Boolean))];
+  }, [bloodBanksData]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredBanks.length / itemsPerPage);
@@ -200,31 +268,36 @@ const BloodBanksManagement = () => {
   const endIndex = startIndex + itemsPerPage;
   const paginatedBanks = filteredBanks.slice(startIndex, endIndex);
 
-  // Get unique cities for filter
-  const uniqueCities = [...new Set(bloodBanksData?.data?.map(bank => bank.address?.city).filter(Boolean))];
+  // ==================== HELPER FUNCTIONS ====================
 
-  // Format date
+  /**
+   * Format date for display
+   */
   const formatDate = (dateString) => {
     return formatAppDate(dateString);
   };
 
-  // Get verification badge
+  /**
+   * Get verification badge based on bank verification status
+   */
   const getVerificationBadge = (bank) => {
     const isVerified = bank.verification?.isVerified;
     return isVerified ? (
-      <div className="badge badge-success gap-1">
-        <FiCheckCircle size={12} />
-        Verified
-      </div>
+      <span className="badge badge-success badge-xs sm:badge-sm gap-1">
+        <FiCheckCircle size={8} className="sm:w-3 sm:h-3" />
+        <span className="text-[10px] sm:text-xs">Verified</span>
+      </span>
     ) : (
-      <div className="badge badge-warning gap-1">
-        <FiXCircle size={12} />
-        Pending
-      </div>
+      <span className="badge badge-warning badge-xs sm:badge-sm gap-1">
+        <FiXCircle size={8} className="sm:w-3 sm:h-3" />
+        <span className="text-[10px] sm:text-xs">Pending</span>
+      </span>
     );
   };
 
-  // Get inventory status
+  /**
+   * Get inventory status with appropriate badge
+   */
   const getInventoryStatus = (inventory) => {
     if (!inventory) return { status: "No Data", color: "badge-ghost" };
 
@@ -240,18 +313,26 @@ const BloodBanksManagement = () => {
     }
   };
 
-  // Handle page change
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Handle page change with smooth scroll
+   */
   const handlePageChange = (page) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Handle export
+  /**
+   * Handle export button click
+   */
   const handleExport = () => {
     showExportOptions(filteredBanks, setIsExporting);
   };
 
-  // Handle delete bank
+  /**
+   * Handle delete bank with confirmation
+   */
   const handleDeleteBank = async (bankId, bankName) => {
     try {
       const result = await Swal.fire({
@@ -271,10 +352,12 @@ const BloodBanksManagement = () => {
         confirmButtonText: "Yes, delete bank",
         cancelButtonText: "Cancel",
         reverseButtons: true,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           title: "text-lg font-bold text-error",
-          htmlContainer: "text-base text-base-content/80",
+          htmlContainer: "text-xs sm:text-sm text-base-content/80",
           confirmButton: "btn btn-sm btn-error text-white",
           cancelButton: "btn btn-sm",
         },
@@ -306,10 +389,12 @@ const BloodBanksManagement = () => {
           showConfirmButton: true,
           confirmButtonColor: "#22c55e",
           confirmButtonText: "OK",
+          background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+          color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
           customClass: {
-            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
             title: "text-lg font-bold text-success",
-            htmlContainer: "text-base text-base-content/80",
+            htmlContainer: "text-xs sm:text-sm text-base-content/80",
             confirmButton: "btn btn-sm btn-success text-white",
           },
           buttonsStyling: false,
@@ -320,7 +405,9 @@ const BloodBanksManagement = () => {
     }
   };
 
-  // Handle verify bank
+  /**
+   * Handle verify/unverify bank
+   */
   const handleVerifyBank = async (bankId, bankName, shouldVerify) => {
     try {
       const result = await Swal.fire({
@@ -342,10 +429,12 @@ const BloodBanksManagement = () => {
         cancelButtonColor: "#6b7280",
         confirmButtonText: shouldVerify ? "Yes, verify" : "Yes, un-verify",
         cancelButtonText: "Cancel",
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           title: `text-lg font-bold ${shouldVerify ? "text-success" : "text-warning"}`,
-          htmlContainer: "text-base text-base-content/80",
+          htmlContainer: "text-xs sm:text-sm text-base-content/80",
           confirmButton: `btn btn-sm ${shouldVerify ? "btn-success" : "btn-warning"} text-white`,
           cancelButton: "btn btn-sm",
         },
@@ -378,10 +467,12 @@ const BloodBanksManagement = () => {
           showConfirmButton: true,
           confirmButtonColor: "#22c55e",
           confirmButtonText: "OK",
+          background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+          color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
           customClass: {
-            popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+            popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
             title: "text-lg font-bold text-success",
-            htmlContainer: "text-base text-base-content/80",
+            htmlContainer: "text-xs sm:text-sm text-base-content/80",
             confirmButton: "btn btn-sm btn-success text-white",
           },
           buttonsStyling: false,
@@ -392,6 +483,28 @@ const BloodBanksManagement = () => {
     } catch (error) {
       console.error("Verification error:", error);
     }
+  };
+
+  /**
+   * Refresh helper for modal actions
+   */
+  const refreshManagementData = async () => {
+    await refetchBanks();
+    if (showLowInventory) {
+      await refetchLowInventory();
+    }
+  };
+
+  /**
+   * Close all modals
+   */
+  const CloseModal = () => {
+    setSelectedBankId(null);
+    document.getElementById('staff_modal')?.close();
+    document.getElementById('add_bank_modal')?.close();
+    document.getElementById('view_bank_modal')?.close();
+    document.getElementById('edit_bank_modal')?.close();
+    document.getElementById('inventory_modal')?.close();
   };
 
   // Reset pagination when filters change
@@ -419,233 +532,201 @@ const BloodBanksManagement = () => {
     );
   }, [location.pathname, location.search, navigate]);
 
-  // Close modals helper
-  const CloseModal = () => {
-    setSelectedBankId(null);
-    document.getElementById('staff_modal')?.close();
-    document.getElementById('add_bank_modal')?.close();
-    document.getElementById('view_bank_modal')?.close();
-    document.getElementById('edit_bank_modal')?.close();
-    document.getElementById('inventory_modal')?.close();
-  };
+  // ==================== LOADING & ERROR STATES ====================
 
-  // Refresh helper for modal actions (avoids unnecessary low-inventory fetches)
-  const refreshManagementData = async () => {
-    await refetchBanks();
-    if (showLowInventory) {
-      await refetchLowInventory();
-    }
-  };
-
-  // Loading state
   if (loadingBanks || loadingLowInventory) return <BloodLoader />;
 
-  // Error state for blood banks
   if (banksError || lowInventoryError) {
     return (
       <ErrorState
         error={[banksErrorData, lowInventoryErrorData]}
-        onRetry={() => refreshManagementData()}
+        onRetry={refreshManagementData}
       />
     );
   }
 
+  // ==================== RENDER ====================
+
   return (
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section with Fade In */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={staggerContainer}
+      className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6"
+    >
+
+      {/* ==================== HEADER SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+        variants={fadeInUp}
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
       >
-        {/* Header copy: communicates context and purpose of blood bank management dashboard. */}
+        {/* Title and description */}
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            {/* Visual identity icon for blood bank management system. */}
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <FiHome className="text-error" />
             Blood Banks Management
-          </h2>
-          <p className="text-base-content/70 text-sm mt-1">
+          </h1>
+          <p className="text-xs sm:text-sm text-base-content/70 mt-1">
             Manage all blood banks, monitor inventory, and verify facilities
           </p>
         </div>
 
-        {/* Action Buttons: low inventory toggle, export, and add bank utilities. */}
-        <div className="flex gap-2">
-          {/* Low Inventory Toggle: filters view to show only banks with low stock. */}
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-2">
+          {/* Low Inventory Toggle */}
           <button
             onClick={() => setShowLowInventory(!showLowInventory)}
-            className={`btn btn-sm gap-2 ${showLowInventory ? 'btn-warning' : 'btn-outline'}`}
+            className={`btn btn-xs sm:btn-sm gap-1 sm:gap-2 ${showLowInventory ? 'btn-warning' : 'btn-outline'
+              }`}
           >
-            <FiAlertCircle size={16} />
-            {showLowInventory ? 'Showing Low Inventory' : 'Show Low Inventory'}
+            <FiAlertCircle size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">
+              {showLowInventory ? 'Showing Low Inventory' : 'Show Low Inventory'}
+            </span>
           </button>
 
-          {/* Export Button with Count: exports current filtered bank set. */}
+          {/* Export Button */}
           <button
             onClick={handleExport}
-            className="btn btn-outline btn-sm gap-2"
+            className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2"
             disabled={isExporting || filteredBanks.length === 0}
           >
             {isExporting ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
-                Exporting...
+                <span className="loading loading-spinner loading-xs"></span>
+                <span className="text-xs sm:text-sm">Exporting...</span>
               </>
             ) : (
               <>
-                <FiDownload size={16} />
-                Export ({filteredBanks.length})
+                <FiDownload size={12} className="sm:w-4 sm:h-4" />
+                <span className="text-xs sm:text-sm">Export ({filteredBanks.length})</span>
               </>
             )}
           </button>
 
-          {/* Add Blood Bank Button: opens modal for new bank creation. */}
+          {/* Add Blood Bank Button */}
           <button
             onClick={() => document.getElementById('add_bank_modal')?.showModal()}
-            className="btn btn-error btn-sm gap-2"
+            className="btn btn-error btn-xs sm:btn-sm gap-1 sm:gap-2"
           >
-            <FiPlus size={16} />
-            Add Blood Bank
+            <FiPlus size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">Add Blood Bank</span>
           </button>
         </div>
       </motion.div>
 
-      {/* Stats Cards with Staggered Fade In */}
+      {/* ==================== STATS CARDS ==================== */}
       <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: {
-              staggerChildren: 0.1 // Each card fades in sequentially with 0.1s delay
-            }
-          }
-        }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4"
+        variants={staggerContainer}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4"
       >
-        {/* Card 1: Total Banks - overall facility count. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-error">
-            <FiHome size={24} />
+        {/* Total Banks Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Total Banks</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-error">
+                {bloodBanksData?.count || 0}
+              </p>
+            </div>
+            <div className="stat-figure bg-error/10 p-2 rounded-full">
+              <FiHome className="text-error text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Total Banks</p>
-          <p className="stat-value text-3xl">{bloodBanksData?.count || 0}</p>
-          <p className="stat-desc">Registered facilities</p>
+          <p className="stat-desc text-xs mt-2">Registered facilities</p>
         </motion.div>
 
-        {/* Card 2: Verified Banks - approved facilities count. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-success">
-            <FiCheckCircle size={24} />
+        {/* Verified Banks Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Verified</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-success">
+                {bloodBanksData?.data?.filter(b => b.verification?.isVerified).length || 0}
+              </p>
+            </div>
+            <div className="stat-figure bg-success/10 p-2 rounded-full">
+              <FiCheckCircle className="text-success text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Verified</p>
-          <p className="stat-value text-3xl">
-            {bloodBanksData?.data?.filter(b => b.verification?.isVerified).length || 0}
-          </p>
-          <p className="stat-desc">Approved banks</p>
+          <p className="stat-desc text-xs mt-2">Approved banks</p>
         </motion.div>
 
-        {/* Card 3: Total Inventory - aggregate blood units across all banks. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-info">
-            <FiDroplet size={24} />
+        {/* Total Inventory Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Total Units</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-info">
+                {bloodBanksData?.data?.reduce((sum, bank) =>
+                  sum + (bank.inventory?.reduce((s, i) => s + (i.units || 0), 0) || 0), 0
+                )}
+              </p>
+            </div>
+            <div className="stat-figure bg-info/10 p-2 rounded-full">
+              <FiDroplet className="text-info text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Total Units</p>
-          <p className="stat-value text-3xl">
-            {bloodBanksData?.data?.reduce((sum, bank) =>
-              sum + (bank.inventory?.reduce((s, i) => s + (i.units || 0), 0) || 0), 0
-            )}
-          </p>
-          <p className="stat-desc">Blood units available</p>
+          <p className="stat-desc text-xs mt-2">Blood units available</p>
         </motion.div>
 
-        {/* Card 4: Low Inventory - banks needing attention. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-warning">
-            <FiAlertCircle size={24} />
+        {/* Low Inventory Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Low Inventory</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-warning">
+                {lowInventoryData?.count || 0}
+              </p>
+            </div>
+            <div className="stat-figure bg-warning/10 p-2 rounded-full">
+              <FiAlertCircle className="text-warning text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Low Inventory</p>
-          <p className="stat-value text-3xl">{lowInventoryData?.count || 0}</p>
-          <p className="stat-desc">Banks need attention</p>
+          <p className="stat-desc text-xs mt-2">Banks need attention</p>
         </motion.div>
 
-        {/* Card 5: Staff Count - total healthcare workers across banks. */}
-        <motion.div
-          variants={{
-            hidden: { opacity: 0, y: 20 },
-            visible: { opacity: 1, y: 0 }
-          }}
-          transition={{ duration: 0.4 }}
-          className="stat bg-base-100 rounded-lg shadow-lg p-4"
-        >
-          <div className="stat-figure text-secondary">
-            <FiUsers size={24} />
+        {/* Staff Count Card */}
+        <motion.div variants={fadeInUp} className="stat bg-base-100 rounded-lg shadow-lg p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="stat-title text-xs sm:text-sm opacity-70">Total Staff</p>
+              <p className="stat-value text-lg sm:text-xl md:text-2xl font-bold text-secondary">
+                {bloodBanksData?.data?.reduce((sum, bank) => sum + (bank.staff?.length || 0), 0)}
+              </p>
+            </div>
+            <div className="stat-figure bg-secondary/10 p-2 rounded-full">
+              <FiUsers className="text-secondary text-sm sm:text-base" />
+            </div>
           </div>
-          <p className="stat-title">Total Staff</p>
-          <p className="stat-value text-3xl">
-            {bloodBanksData?.data?.reduce((sum, bank) => sum + (bank.staff?.length || 0), 0)}
-          </p>
-          <p className="stat-desc">Healthcare workers</p>
+          <p className="stat-desc text-xs mt-2">Healthcare workers</p>
         </motion.div>
       </motion.div>
 
-      {/* Filters Section with Fade In */}
+      {/* ==================== FILTERS SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-4"
+        variants={fadeInUp}
+        className="bg-base-100 rounded-lg shadow-lg border border-base-300 p-3 sm:p-4"
       >
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search input: free-text search across bank fields. */}
+        <div className="flex flex-col lg:flex-row gap-3 sm:gap-4">
+
+          {/* Search Input */}
           <div className="flex-1">
             <div className="form-control">
               <input
                 type="text"
                 placeholder="Search by name, registration number, city..."
-                className="input input-bordered w-full"
+                className="input input-bordered input-sm sm:input-md w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
 
-          {/* Type Filter: dropdown for bank type filtering. */}
+          {/* Type Filter */}
           <div className="w-full lg:w-48">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
             >
@@ -657,10 +738,10 @@ const BloodBanksManagement = () => {
             </select>
           </div>
 
-          {/* City Filter: dropdown for geographic filtering. */}
+          {/* City Filter */}
           <div className="w-full lg:w-48">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={selectedCity}
               onChange={(e) => setSelectedCity(e.target.value)}
             >
@@ -671,10 +752,10 @@ const BloodBanksManagement = () => {
             </select>
           </div>
 
-          {/* Verification Filter: filters by verification status. */}
+          {/* Verification Filter */}
           <div className="w-full lg:w-48">
             <select
-              className="select select-bordered w-full"
+              className="select select-bordered select-sm sm:select-md w-full"
               value={verificationStatus}
               onChange={(e) => setVerificationStatus(e.target.value)}
             >
@@ -684,9 +765,9 @@ const BloodBanksManagement = () => {
             </select>
           </div>
 
-          {/* Reset Filters: clears all filter inputs. */}
+          {/* Reset Filters Button */}
           <button
-            className="btn btn-outline btn-square"
+            className="btn btn-outline btn-sm btn-square"
             onClick={() => {
               setSearchTerm("");
               setSelectedType("");
@@ -695,17 +776,13 @@ const BloodBanksManagement = () => {
               setShowLowInventory(false);
             }}
           >
-            <FiRefreshCw size={18} />
+            <FiRefreshCw size={14} className="sm:w-4 sm:h-4" />
           </button>
         </div>
       </motion.div>
 
-      {/* Results Count with Fade In: shows current range and total items. */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
-      >
+      {/* ==================== RESULTS COUNT ==================== */}
+      <motion.div variants={fadeInUp}>
         <ResultsCount
           endIndex={endIndex}
           startIndex={startIndex}
@@ -716,31 +793,27 @@ const BloodBanksManagement = () => {
         />
       </motion.div>
 
-      {/* Main Blood Banks Table with Fade In */}
+      {/* ==================== BLOOD BANKS TABLE ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.25 }}
+        variants={fadeInUp}
         className="overflow-x-auto bg-base-100 rounded-lg shadow-lg border border-base-300"
       >
-        <table className="table table-zebra w-full">
-          {/* Table Header: column definitions for blood bank data. */}
+        <table className="table table-xs sm:table-sm md:table-md w-full">
           <thead>
             <tr className="bg-base-200">
-              <th className="w-12">#</th>
-              <th>Blood Bank</th>
-              <th>Type</th>
-              <th>Contact</th>
-              <th>Location</th>
-              <th>Inventory</th>
-              <th>Status</th>
-              <th>Staff</th>
-              <th>Registered</th>
-              <th className="text-center">Actions</th>
+              <th className="text-xs sm:text-sm w-12">#</th>
+              <th className="text-xs sm:text-sm">Blood Bank</th>
+              <th className="text-xs sm:text-sm">Type</th>
+              <th className="text-xs sm:text-sm hidden md:table-cell">Contact</th>
+              <th className="text-xs sm:text-sm hidden lg:table-cell">Location</th>
+              <th className="text-xs sm:text-sm">Inventory</th>
+              <th className="text-xs sm:text-sm">Status</th>
+              <th className="text-xs sm:text-sm hidden xl:table-cell">Staff</th>
+              <th className="text-xs sm:text-sm hidden xl:table-cell">Registered</th>
+              <th className="text-xs sm:text-sm text-center">Actions</th>
             </tr>
           </thead>
 
-          {/* Table Body with staggered row animations */}
           <tbody>
             {paginatedBanks.length > 0 ? (
               paginatedBanks.map((bank, index) => {
@@ -751,180 +824,182 @@ const BloodBanksManagement = () => {
                 return (
                   <motion.tr
                     key={bank._id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: 0.3 + index * 0.02 }}
+                    variants={tableRowVariants}
+                    custom={index}
+                    initial="hidden"
+                    animate="visible"
                     className="hover"
                   >
-                    {/* Index: sequential number with pagination offset. */}
-                    <td className="font-medium">{startIndex + index + 1}</td>
+                    <td className="text-xs sm:text-sm font-medium">{startIndex + index + 1}</td>
 
-                    {/* Blood Bank Details: name + registration number with icon. */}
+                    {/* Blood Bank Details */}
                     <td>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
                         <div className="avatar">
-                          <div className="w-10 h-10 rounded-full bg-error/10 flex items-center justify-center">
-                            <FiHome className="text-error text-xl" />
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-error/10 flex items-center justify-center">
+                            <FiHome className="text-error text-sm sm:text-base" />
                           </div>
                         </div>
                         <div>
-                          <div className="font-semibold">{bank.name}</div>
-                          <div className="text-sm text-base-content/70">
+                          <div className="font-semibold text-xs sm:text-sm truncate max-w-24 sm:max-w-32">
+                            {bank.name}
+                          </div>
+                          <div className="text-[10px] sm:text-xs text-base-content/70 truncate max-w-24 sm:max-w-32">
                             Reg: {bank.registrationNumber}
                           </div>
                         </div>
                       </div>
                     </td>
 
-                    {/* Type: color-coded badge with icon. */}
+                    {/* Type */}
                     <td>
-                      <div className={`badge ${bankTypeConfig[bank.type]?.color || "badge-ghost"} gap-1`}>
-                        <TypeIcon size={12} />
-                        {bankTypeConfig[bank.type]?.label || bank.type}
+                      <div className={`badge ${bankTypeConfig[bank.type]?.color || "badge-ghost"} badge-xs sm:badge-sm gap-1`}>
+                        <TypeIcon size={8} className="sm:w-3 sm:h-3" />
+                        <span className="text-[10px] sm:text-xs">{bankTypeConfig[bank.type]?.label || bank.type}</span>
                       </div>
                     </td>
 
-                    {/* Contact: phone and email with icons. */}
-                    <td>
+                    {/* Contact - Hidden on mobile */}
+                    <td className="hidden md:table-cell">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-sm">
-                          <FiPhone size={12} className="text-base-content/50" />
+                        <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                          <FiPhone size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
                           <span>{bank.contact?.phone?.[0] || "N/A"}</span>
                         </div>
                         {bank.contact?.email && (
-                          <div className="flex items-center gap-1 text-sm">
-                            <FiMail size={12} className="text-base-content/50" />
+                          <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                            <FiMail size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
                             <span className="truncate max-w-24">{bank.contact.email}</span>
                           </div>
                         )}
                       </div>
                     </td>
 
-                    {/* Location: city and state with map pin. */}
-                    <td>
-                      <div className="flex items-center gap-1 text-sm">
-                        <FiMapPin size={12} className="text-base-content/50" />
-                        <span>
+                    {/* Location - Hidden on tablet */}
+                    <td className="hidden lg:table-cell">
+                      <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                        <FiMapPin size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
+                        <span className="truncate max-w-24">
                           {bank.address?.city}, {bank.address?.state}
                         </span>
                       </div>
                     </td>
 
-                    {/* Inventory: status badge + low inventory indicators. */}
+                    {/* Inventory */}
                     <td>
                       <div className="space-y-1">
-                        <div className={`badge ${inventoryStatus.color} gap-1`}>
-                          <FiPackage size={12} />
-                          {inventoryStatus.status}
+                        <div className={`badge ${inventoryStatus.color} badge-xs sm:badge-sm gap-1`}>
+                          <FiPackage size={8} className="sm:w-3 sm:h-3" />
+                          <span className="text-[10px] sm:text-xs">{inventoryStatus.status}</span>
                         </div>
                         {lowInventoryItems.length > 0 && (
-                          <div className="text-xs text-warning">
+                          <div className="text-[8px] sm:text-xs text-warning">
                             {lowInventoryItems.map(item => item.bloodType).join(', ')} low
                           </div>
                         )}
                       </div>
                     </td>
 
-                    {/* Status: verification badge. */}
+                    {/* Status */}
                     <td>
                       <div className="space-y-1">
                         {getVerificationBadge(bank)}
                       </div>
                     </td>
 
-                    {/* Staff: staff count with icon. */}
-                    <td>
-                      <div className="flex items-center gap-1 text-sm">
-                        <FiUsers size={12} className="text-base-content/50" />
+                    {/* Staff - Hidden on desktop */}
+                    <td className="hidden xl:table-cell">
+                      <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                        <FiUsers size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
                         <span>{bank.staff?.length || 0}</span>
                       </div>
                     </td>
 
-                    {/* Registered Date: creation date formatted. */}
-                    <td>
-                      <div className="flex items-center gap-1 text-sm">
-                        <FiCalendar size={12} className="text-base-content/50" />
+                    {/* Registered Date - Hidden on desktop */}
+                    <td className="hidden xl:table-cell">
+                      <div className="flex items-center gap-1 text-[10px] sm:text-xs">
+                        <FiCalendar size={8} className="sm:w-3 sm:h-3 text-base-content/50" />
                         <span>{formatDate(bank.createdAt)}</span>
                       </div>
                     </td>
 
-                    {/* Actions: comprehensive action buttons with tooltips */}
+                    {/* Actions */}
                     <td>
                       <div className="flex justify-center gap-1">
-                        {/* View button - opens detail modal */}
+                        {/* View Button */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
                             document.getElementById('view_bank_modal')?.showModal();
                           }}
-                          className="btn btn-ghost btn-sm btn-square tooltip"
+                          className="btn btn-ghost btn-xs sm:btn-sm btn-square tooltip"
                           data-tip="View Details"
                         >
-                          <FiEye size={16} />
+                          <FiEye size={12} className="sm:w-4 sm:h-4" />
                         </button>
 
-                        {/* Inventory button - opens inventory management */}
+                        {/* Inventory Button */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
                             document.getElementById('inventory_modal')?.showModal();
                           }}
-                          className="btn btn-ghost btn-sm btn-square tooltip text-info"
+                          className="btn btn-ghost btn-xs sm:btn-sm btn-square tooltip text-info"
                           data-tip="Manage Inventory"
                         >
-                          <FiDroplet size={16} />
+                          <FiDroplet size={12} className="sm:w-4 sm:h-4" />
                         </button>
 
-                        {/* Staff button - opens staff management */}
+                        {/* Staff Button */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
                             document.getElementById('staff_modal')?.showModal();
                           }}
-                          className="btn btn-ghost btn-sm btn-square tooltip text-secondary"
+                          className="btn btn-ghost btn-xs sm:btn-sm btn-square tooltip text-secondary"
                           data-tip="Manage Staff"
                         >
-                          <FiUsers size={16} />
+                          <FiUsers size={12} className="sm:w-4 sm:h-4" />
                         </button>
 
-                        {/* Edit button - opens edit modal */}
+                        {/* Edit Button */}
                         <button
                           onClick={() => {
                             setSelectedBankId(bank._id);
                             document.getElementById('edit_bank_modal')?.showModal();
                           }}
-                          className="btn btn-ghost btn-sm btn-square tooltip"
+                          className="btn btn-ghost btn-xs sm:btn-sm btn-square tooltip"
                           data-tip="Edit"
                         >
-                          <FiEdit2 size={16} />
+                          <FiEdit2 size={12} className="sm:w-4 sm:h-4" />
                         </button>
 
-                        {/* Verify/Un-verify toggle - conditional verification action */}
+                        {/* Verify/Un-verify Toggle */}
                         {!bank.verification?.isVerified ? (
                           <button
                             onClick={() => handleVerifyBank(bank._id, bank.name, true)}
-                            className="btn btn-ghost btn-sm btn-square text-success tooltip"
+                            className="btn btn-ghost btn-xs sm:btn-sm btn-square text-success tooltip"
                             data-tip="Verify"
                           >
-                            <FiCheckCircle size={16} />
+                            <FiCheckCircle size={12} className="sm:w-4 sm:h-4" />
                           </button>
                         ) : (
                           <button
                             onClick={() => handleVerifyBank(bank._id, bank.name, false)}
-                            className="btn btn-ghost btn-sm btn-square text-warning tooltip"
+                            className="btn btn-ghost btn-xs sm:btn-sm btn-square text-warning tooltip"
                             data-tip="Un-verify"
                           >
-                            <FiXCircle size={16} />
+                            <FiXCircle size={12} className="sm:w-4 sm:h-4" />
                           </button>
                         )}
 
-                        {/* Delete button - triggers delete confirmation */}
+                        {/* Delete Button */}
                         <button
                           onClick={() => handleDeleteBank(bank._id, bank.name)}
-                          className="btn btn-ghost btn-sm btn-square text-error tooltip"
+                          className="btn btn-ghost btn-xs sm:btn-sm btn-square text-error tooltip"
                           data-tip="Delete"
                         >
-                          <FiTrash2 size={16} />
+                          <FiTrash2 size={12} className="sm:w-4 sm:h-4" />
                         </button>
                       </div>
                     </td>
@@ -932,17 +1007,17 @@ const BloodBanksManagement = () => {
                 );
               })
             ) : (
-              // Empty state with animation
+              // Empty State
               <motion.tr
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.35 }}
               >
-                <td colSpan={10} className="text-center py-12">
+                <td colSpan={10} className="text-center py-8 sm:py-12">
                   <div className="flex flex-col items-center gap-2">
-                    <FiHome size={48} className="text-base-content/30" />
-                    <h3 className="text-lg font-semibold text-base-content/70">No blood banks found</h3>
-                    <p className="text-sm text-base-content/50">
+                    <FiHome size={32} className="sm:w-12 sm:h-12 text-base-content/30" />
+                    <h3 className="text-sm sm:text-base font-semibold text-base-content/70">No blood banks found</h3>
+                    <p className="text-xs sm:text-sm text-base-content/50">
                       Try adjusting your filters or add a new blood bank
                     </p>
                   </div>
@@ -953,13 +1028,9 @@ const BloodBanksManagement = () => {
         </table>
       </motion.div>
 
-      {/* Pagination with Fade In */}
+      {/* ==================== PAGINATION ==================== */}
       {filteredBanks.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.35 }}
-        >
+        <motion.div variants={fadeInUp}>
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
@@ -968,15 +1039,15 @@ const BloodBanksManagement = () => {
         </motion.div>
       )}
 
-      {/* Modals - all with native dialog animations preserved */}
+      {/* ==================== MODALS ==================== */}
 
       {/* Add Blood Bank Modal */}
       <dialog id="add_bank_modal" className="modal">
         <AddBloodBankModal
-          onClose={() => CloseModal()}
-          refreshBanks={() => refreshManagementData()}
+          onClose={CloseModal}
+          refreshBanks={refreshManagementData}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
@@ -985,10 +1056,10 @@ const BloodBanksManagement = () => {
       <dialog id="edit_bank_modal" className="modal">
         <EditBloodBankModal
           bankId={selectedBankId}
-          onClose={() => CloseModal()}
-          refreshBanks={() => refreshManagementData()}
+          onClose={CloseModal}
+          refreshBanks={refreshManagementData}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
@@ -997,9 +1068,9 @@ const BloodBanksManagement = () => {
       <dialog id="view_bank_modal" className="modal">
         <ViewBloodBankModal
           bankId={selectedBankId}
-          onClose={() => CloseModal()}
+          onClose={CloseModal}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
@@ -1008,10 +1079,10 @@ const BloodBanksManagement = () => {
       <dialog id="inventory_modal" className="modal">
         <InventoryModal
           bankId={selectedBankId}
-          onClose={() => CloseModal()}
-          refreshBanks={() => refreshManagementData()}
+          onClose={CloseModal}
+          refreshBanks={refreshManagementData}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
@@ -1020,14 +1091,14 @@ const BloodBanksManagement = () => {
       <dialog id="staff_modal" className="modal">
         <StaffModal
           bankId={selectedBankId}
-          onClose={() => CloseModal()}
-          refreshBanks={() => refreshManagementData()}
+          onClose={CloseModal}
+          refreshBanks={refreshManagementData}
         />
-        <form onClick={() => CloseModal()} method="dialog" className="modal-backdrop">
+        <form onClick={CloseModal} method="dialog" className="modal-backdrop hidden md:block">
           <button>close</button>
         </form>
       </dialog>
-    </div>
+    </motion.div>
   );
 };
 

@@ -40,16 +40,57 @@ import RequestsByStatus from "./RequestsByStatus/RequestsByStatus";
 import BloodTypeDistribution from "./BloodTypeDistribution/BloodTypeDistribution";
 import { showDashboardExportOptions } from "./ExportReport";
 
+// ==================== QUERY KEYS ====================
+
+const queryKeys = {
+  dashboardSummary: (refreshKey) => ['dashboard-summary', refreshKey],
+  usersCount: (refreshKey) => ['users-count', refreshKey],
+  donorsCount: (refreshKey) => ['donors-count', refreshKey],
+  banksCount: (refreshKey) => ['banks-count', refreshKey],
+  requestsStats: (refreshKey) => ['requests-stats', refreshKey],
+  actionStats: (dateRange, refreshKey) => ['action-stats', dateRange, refreshKey],
+  recentActivities: (refreshKey) => ['recent-activities', refreshKey],
+};
+
+// ==================== ANIMATION VARIANTS ====================
+
+const fadeInUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0 }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+// ==================== MAIN COMPONENT ====================
+
+/**
+ * Admin Dashboard Component
+ * Displays comprehensive system statistics, charts, and metrics
+ * Fetches data from multiple endpoints and combines them
+ */
 const AdminDashboard = () => {
   const { axiosInstance } = useAxiosPublic();
   const token = localStorage.getItem("auth_token");
 
-  // States
+  // ==================== STATE MANAGEMENT ====================
+
   const [dateRange, setDateRange] = useState("30");
   const [refreshKey, setRefreshKey] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
 
-  // 🔹 Fetch Dashboard Summary
+  // ==================== TANSTACK QUERIES ====================
+
+  /**
+   * Query 1: Fetch Dashboard Summary
+   */
   const {
     data: summaryData,
     isLoading: loadingSummary,
@@ -57,16 +98,19 @@ const AdminDashboard = () => {
     error: summaryErrorData,
     refetch: refetchSummary,
   } = useQuery({
-    queryKey: ["dashboard-summary", refreshKey],
+    queryKey: queryKeys.dashboardSummary(refreshKey),
     queryFn: async () => {
       const res = await axiosInstance.get("/audit-logs/dashboard/summary", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // 🔹 Fetch Users Count
+  /**
+   * Query 2: Fetch Users Count
+   */
   const {
     data: usersData,
     isLoading: loadingUsers,
@@ -74,16 +118,19 @@ const AdminDashboard = () => {
     error: usersErrorData,
     refetch: refetchUsers,
   } = useQuery({
-    queryKey: ["users-count", refreshKey],
+    queryKey: queryKeys.usersCount(refreshKey),
     queryFn: async () => {
       const res = await axiosInstance.get("/users/admin/all-users", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // 🔹 Fetch Donors Count
+  /**
+   * Query 3: Fetch Donors Count
+   */
   const {
     data: donorsData,
     isLoading: loadingDonors,
@@ -91,16 +138,19 @@ const AdminDashboard = () => {
     error: donorsErrorData,
     refetch: refetchDonors,
   } = useQuery({
-    queryKey: ["donors-count", refreshKey],
+    queryKey: queryKeys.donorsCount(refreshKey),
     queryFn: async () => {
       const res = await axiosInstance.get("/users/admin/donors", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // 🔹 Fetch Blood Banks Count
+  /**
+   * Query 4: Fetch Blood Banks Count
+   */
   const {
     data: banksData,
     isLoading: loadingBanks,
@@ -108,16 +158,19 @@ const AdminDashboard = () => {
     error: banksErrorData,
     refetch: refetchBanks,
   } = useQuery({
-    queryKey: ["banks-count", refreshKey],
+    queryKey: queryKeys.banksCount(refreshKey),
     queryFn: async () => {
       const res = await axiosInstance.get("/blood-banks", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // 🔹 Fetch Requests Stats
+  /**
+   * Query 5: Fetch Requests Statistics
+   */
   const {
     data: requestsData,
     isLoading: loadingRequests,
@@ -125,16 +178,19 @@ const AdminDashboard = () => {
     error: requestsErrorData,
     refetch: refetchRequests,
   } = useQuery({
-    queryKey: ["requests-stats", refreshKey],
+    queryKey: queryKeys.requestsStats(refreshKey),
     queryFn: async () => {
       const res = await axiosInstance.get("/blood-requests/stats/overview", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // 🔹 Fetch Action Statistics
+  /**
+   * Query 6: Fetch Action Statistics (filtered by date range)
+   */
   const {
     data: actionStatsData,
     isLoading: loadingActionStats,
@@ -142,16 +198,19 @@ const AdminDashboard = () => {
     error: actionStatsErrorData,
     refetch: refetchActionStats,
   } = useQuery({
-    queryKey: ["action-stats", dateRange, refreshKey],
+    queryKey: queryKeys.actionStats(dateRange, refreshKey),
     queryFn: async () => {
       const res = await axiosInstance.get(`/audit-logs/stats/actions?days=${dateRange}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 2 * 60 * 1000, // 2 minutes - changes more frequently
   });
 
-  // 🔹 Fetch Recent Activities
+  /**
+   * Query 7: Fetch Recent Activities
+   */
   const {
     data: recentActivitiesData,
     isLoading: loadingActivities,
@@ -159,37 +218,41 @@ const AdminDashboard = () => {
     error: activitiesErrorData,
     refetch: refetchActivities,
   } = useQuery({
-    queryKey: ["recent-activities", refreshKey],
+    queryKey: queryKeys.recentActivities(refreshKey),
     queryFn: async () => {
       const res = await axiosInstance.get("/audit-logs?limit=10", {
         headers: { Authorization: `Bearer ${token}` },
       });
       return res.data;
     },
+    staleTime: 1 * 60 * 1000, // 1 minute - very frequent changes
   });
 
-  // Calculate derived stats
+  // ==================== COMPUTED VALUES ====================
+
+  /**
+   * Calculate derived statistics from raw data
+   */
   const totalUsers = usersData?.count || 0;
   const totalDonors = donorsData?.count || 0;
   const totalBanks = banksData?.count || 0;
   const verifiedBanks = banksData?.data?.filter(b => b.verification?.isVerified).length || 0;
 
-  // Requests
+  // Requests statistics
   const pendingRequests = requestsData?.data?.byStatus?.find(s => s._id === "pending")?.count || 0;
   const fulfilledRequests = requestsData?.data?.byStatus?.find(s => s._id === "fulfilled")?.count || 0;
   const totalRequests = requestsData?.data?.byStatus?.reduce((sum, s) => sum + s.count, 0) || 0;
 
-  // Total Inventory
+  // Inventory statistics
   const totalInventory = banksData?.data?.reduce((sum, bank) =>
     sum + (bank.inventory?.reduce((s, i) => s + (i.units || 0), 0) || 0), 0
   ) || 0;
 
-  // Low Inventory
   const lowInventoryCount = banksData?.data?.filter(bank =>
     bank.inventory?.some(item => item.units <= item.threshold)
   ).length || 0;
 
-  // Urgent Requests
+  // Urgent requests
   const urgentRequests = requestsData?.data?.byUrgency?.find(u => u._id === "emergency")?.count || 0;
 
   // Calculate completion rate
@@ -197,18 +260,28 @@ const AdminDashboard = () => {
     ? Math.round((fulfilledRequests / totalRequests) * 100)
     : 0;
 
-  // Handle Refresh
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Handle refresh of all dashboard data
+   */
   const handleRefresh = () => {
-    refetchUsers()
-    refetchBanks()
-    refetchDonors()
-    refetchSummary()
-    refetchRequests()
-    refetchActivities()
-    refetchActionStats()
+    // Increment refresh key to trigger all queries to refetch
     setRefreshKey(prev => prev + 1);
+
+    // Also manually trigger refetch for each query
+    refetchUsers();
+    refetchBanks();
+    refetchDonors();
+    refetchSummary();
+    refetchRequests();
+    refetchActivities();
+    refetchActionStats();
   };
 
+  /**
+   * Handle export of dashboard report
+   */
   const handleExport = () => {
     showDashboardExportOptions(
       {
@@ -235,47 +308,62 @@ const AdminDashboard = () => {
     );
   };
 
-  // Loading state
+  // ==================== LOADING STATE ====================
+
   if (loadingSummary || loadingUsers || loadingDonors || loadingBanks || loadingRequests || loadingActionStats || loadingActivities) {
     return <BloodLoader />;
   }
 
-  // Error state
+  // ==================== ERROR STATE ====================
+
   if (summaryError || usersError || donorsError || banksError || requestsError || actionStatsError || activitiesError) {
     return (
       <ErrorState
-        error={[summaryErrorData, usersErrorData, donorsErrorData, banksErrorData, requestsErrorData, actionStatsErrorData, activitiesErrorData]}
-        onRetry={() => {
-          handleRefresh();
-        }}
+        error={[
+          summaryErrorData,
+          usersErrorData,
+          donorsErrorData,
+          banksErrorData,
+          requestsErrorData,
+          actionStatsErrorData,
+          activitiesErrorData,
+        ]}
+        onRetry={handleRefresh}
       />
     );
   }
 
+  // ==================== RENDER ====================
+
   return (
-    <div className="space-y-6 min-h-screen bg-base-200 p-6">
-      {/* Header Section */}
+    <motion.div
+      initial="hidden"
+      animate="visible"
+      variants={staggerContainer}
+      className="space-y-4 sm:space-y-6 min-h-screen bg-base-200 p-3 sm:p-4 md:p-6"
+    >
+
+      {/* ==================== HEADER SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"
+        variants={fadeInUp}
+        className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4"
       >
+        {/* Title and description */}
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
             <FiActivity className="text-error" />
             Dashboard Overview
-          </h2>
-          <p className="text-base-content/70 text-sm mt-1">
+          </h1>
+          <p className="text-xs sm:text-sm text-base-content/70 mt-1">
             Monitor blood donation activities, requests, and system statistics
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
           {/* Date Range Selector */}
           <select
-            className="select select-bordered select-sm"
+            className="select select-bordered select-xs sm:select-sm w-full sm:w-auto"
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value)}
           >
@@ -288,36 +376,30 @@ const AdminDashboard = () => {
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
-            className="btn btn-outline btn-sm gap-2"
+            className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2 flex-1 sm:flex-none"
           >
-            <FiRefreshCw size={16} />
-            Refresh
+            <FiRefreshCw size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">Refresh</span>
           </button>
 
           {/* Export Button */}
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="btn btn-outline btn-sm gap-2"
+            className="btn btn-outline btn-xs sm:btn-sm gap-1 sm:gap-2 flex-1 sm:flex-none"
           >
-            <FiDownload size={16} />
-            {isExporting ? "Exporting..." : "Export Report"}
+            <FiDownload size={12} className="sm:w-4 sm:h-4" />
+            <span className="text-xs sm:text-sm">
+              {isExporting ? "Exporting..." : "Export Report"}
+            </span>
           </button>
         </div>
       </motion.div>
 
-      {/* Key Metrics Stats Cards */}
+      {/* ==================== KEY METRICS STATS CARDS ==================== */}
       <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1 }
-          }
-        }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        variants={staggerContainer}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
       >
         <StatCard
           title="Total Users"
@@ -352,18 +434,10 @@ const AdminDashboard = () => {
         />
       </motion.div>
 
-      {/* Secondary Stats Row */}
+      {/* ==================== SECONDARY STATS ROW ==================== */}
       <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={{
-          hidden: { opacity: 0 },
-          visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1 }
-          }
-        }}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+        variants={staggerContainer}
+        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
       >
         <StatCard
           title="Total Requests"
@@ -398,13 +472,12 @@ const AdminDashboard = () => {
         />
       </motion.div>
 
-      {/* Charts and Statistics Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* ==================== CHARTS AND STATISTICS ROW 1 ==================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Activity Chart */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
+          variants={fadeInUp}
+          transition={{ delay: 0.3 }}
         >
           <ActivityChart
             data={actionStatsData?.data?.byDay || []}
@@ -414,9 +487,8 @@ const AdminDashboard = () => {
 
         {/* Requests by Status */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
+          variants={fadeInUp}
+          transition={{ delay: 0.4 }}
         >
           <RequestsByStatus
             data={requestsData?.data?.byStatus || []}
@@ -425,13 +497,12 @@ const AdminDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Charts and Statistics Row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ==================== CHARTS AND STATISTICS ROW 2 ==================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Blood Type Distribution */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
+          variants={fadeInUp}
+          transition={{ delay: 0.5 }}
           className="lg:col-span-1"
         >
           <BloodTypeDistribution
@@ -442,9 +513,8 @@ const AdminDashboard = () => {
 
         {/* Action Statistics */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+          variants={fadeInUp}
+          transition={{ delay: 0.6 }}
           className="lg:col-span-2"
         >
           <ActionStatistics
@@ -454,13 +524,12 @@ const AdminDashboard = () => {
         </motion.div>
       </div>
 
-      {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ==================== BOTTOM SECTION ==================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Recent Activities */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.7 }}
+          variants={fadeInUp}
+          transition={{ delay: 0.7 }}
           className="lg:col-span-2"
         >
           <RecentActivities
@@ -471,24 +540,22 @@ const AdminDashboard = () => {
 
         {/* Quick Actions */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.8 }}
+          variants={fadeInUp}
+          transition={{ delay: 0.8 }}
           className="lg:col-span-1"
         >
           <QuickActions />
         </motion.div>
       </div>
 
-      {/* Top Donors Section */}
+      {/* ==================== TOP DONORS SECTION ==================== */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, delay: 0.9 }}
+        variants={fadeInUp}
+        transition={{ delay: 0.9 }}
       >
         <TopDonors />
       </motion.div>
-    </div>
+    </motion.div>
   );
 };
 

@@ -5,7 +5,7 @@ import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 
 // eslint-disable-next-line no-unused-vars
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Sweet Alert
 import Swal from "sweetalert2";
@@ -39,17 +39,112 @@ import useAxiosPublic from "../../../../../hooks/useAxiosPublic";
 // Shared
 import BloodLoader from "../../../../../shared/BloodLoader";
 
+// ==================== CONSTANTS ====================
+
+/**
+ * Blood types for selection
+ */
+const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+/**
+ * Gender options
+ */
+const GENDERS = ["Male", "Female", "Other", "Prefer not to say"];
+
+/**
+ * All possible roles with their configurations
+ */
+const ALL_ROLES = [
+  {
+    value: "donor",
+    label: "Blood Donor",
+    icon: FaTint,
+    description: "User can donate blood",
+    color: "success"
+  },
+  {
+    value: "requester",
+    label: "Blood Requester",
+    icon: FaHeartbeat,
+    description: "User can request blood",
+    color: "warning"
+  },
+  {
+    value: "hospital",
+    label: "Hospital Staff",
+    icon: FaMapMarkerAlt,
+    description: "User represents a hospital",
+    color: "info"
+  },
+  {
+    value: "blood_bank",
+    label: "Blood Bank Staff",
+    icon: FaBuilding,
+    description: "User works at blood bank",
+    color: "secondary"
+  },
+  {
+    value: "admin",
+    label: "Administrator",
+    icon: FaShieldAlt,
+    description: "User has admin privileges",
+    color: "error"
+  },
+];
+
+// ==================== ANIMATION VARIANTS ====================
+
+const modalVariants = {
+  hidden: { opacity: 0, scale: 0.95, y: 20 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    y: 0,
+    transition: {
+      duration: 0.3,
+      ease: "easeOut"
+    }
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.95,
+    y: 20,
+    transition: {
+      duration: 0.2,
+      ease: "easeIn"
+    }
+  }
+};
+
+const stepVariants = {
+  hidden: { opacity: 0, x: 20 },
+  visible: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -20 }
+};
+
+// ==================== MAIN COMPONENT ====================
+
+/**
+ * Edit User Modal Component
+ * Multi-step form for editing existing users
+ * 
+ * @param {string} userId - ID of the user to edit
+ * @param {Function} refreshUsers - Function to refresh users list
+ * @param {Function} onClose - Function to close the modal
+ */
 const EditUserModal = ({ userId, refreshUsers, onClose }) => {
   const { axiosInstance } = useAxiosPublic();
   const { user: currentUser, loading: authLoading } = useAuth();
 
-  // States
+  // ==================== STATE MANAGEMENT ====================
+
   const [step, setStep] = useState(1);
   const [apiError, setApiError] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
 
-  // Form handling
+  // ==================== FORM HANDLING ====================
+
   const {
     register,
     handleSubmit,
@@ -94,58 +189,43 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
     },
   });
 
-  // Watch form values
+  // Watch form values for dynamic UI updates
   const selectedRole = watch("role");
   const selectedBloodGroup = watch("bloodGroup");
-  // const selectedGender = watch("gender");
 
-  // Constants
-  const bloodTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
-  const genders = ["Male", "Female", "Other", "Prefer not to say"];
+  // ==================== COMPUTED VALUES ====================
 
-  // Roles
-  const allRoles = [
-    { value: "donor", label: "Blood Donor", icon: FaTint, description: "User can donate blood", color: "success" },
-    { value: "requester", label: "Blood Requester", icon: FaHeartbeat, description: "User can request blood", color: "warning" },
-    { value: "hospital", label: "Hospital Staff", icon: FaMapMarkerAlt, description: "User represents a hospital", color: "info" },
-    { value: "blood_bank", label: "Blood Bank Staff", icon: FaBuilding, description: "User works at blood bank", color: "secondary" },
-    { value: "admin", label: "Administrator", icon: FaShieldAlt, description: "User has admin privileges", color: "error" },
-  ];
-
-  // Filter roles based on current user
-  const roles = allRoles.filter(role => {
+  /**
+   * Filter roles based on current user's permissions
+   */
+  const roles = ALL_ROLES.filter(role => {
     if (currentUser?.role === "super_admin") return true;
     if (currentUser?.role === "admin" && role.value === "admin") return false;
     return true;
   });
 
-  // Fetch user data on mount
+  // ==================== EFFECTS ====================
+
+  /**
+   * Fetch user data when component mounts or userId changes
+   */
   useEffect(() => {
-
-    // Function to fetch user data
     const fetchUserData = async () => {
-
-      // Check if userId is available
       if (!userId) {
         setFetchLoading(false);
         return;
       }
 
-      // Reset form and set loading state
       setApiError("");
       setFetchLoading(true);
 
       try {
-
-        // Fetch user data
         const response = await axiosInstance.get(`/users/profile/${userId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("auth_token")}` }
         });
 
-
-        // Check different possible response structures
+        // Extract user data from various possible response structures
         let user = null;
-
         if (response.data?.success && response.data?.data) {
           user = response.data.data;
         } else if (response.data?.data) {
@@ -194,7 +274,11 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
     fetchUserData();
   }, [userId, axiosInstance, setValue]);
 
-  // Close Modal Function
+  // ==================== HANDLER FUNCTIONS ====================
+
+  /**
+   * Close modal and reset form
+   */
   const closeModal = () => {
     reset();
     setStep(1);
@@ -207,7 +291,9 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
     }
   };
 
-  // Step Next handler
+  /**
+   * Validate and move to next step
+   */
   const nextStep = async () => {
     setApiError("");
     let fieldsToValidate = [];
@@ -222,13 +308,17 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
     }
   };
 
-  // Step Prev handler
+  /**
+   * Go to previous step
+   */
   const prevStep = () => {
     setApiError("");
     setStep(step - 1);
   };
 
-  // Submit handler - Update user profile
+  /**
+   * Form submission handler - Update user profile
+   */
   const onSubmit = async (data) => {
     setLoading(true);
     setApiError("");
@@ -302,10 +392,12 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
         icon: "success",
         timer: 2000,
         showConfirmButton: true,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           title: "text-lg font-bold text-success",
-          content: "text-base text-base-content/80",
+          content: "text-xs sm:text-sm text-base-content/80",
           confirmButton: "btn btn-sm btn-success",
         },
         buttonsStyling: false,
@@ -332,10 +424,12 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
         icon: "error",
         timer: 3000,
         showConfirmButton: true,
+        background: document.documentElement.classList.contains('dark') ? '#1f2937' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#ffffff' : '#1f2937',
         customClass: {
-          popup: "bg-base-100 border border-base-300 rounded-xl p-6 shadow-lg",
+          popup: "bg-base-100 border border-base-300 rounded-xl p-4 sm:p-6 shadow-lg",
           title: "text-lg font-bold text-error",
-          content: "text-base text-base-content/80",
+          content: "text-xs sm:text-sm text-base-content/80",
           confirmButton: "btn btn-sm btn-error",
         },
         buttonsStyling: false,
@@ -345,75 +439,102 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
     }
   };
 
-  // Render
+  // ==================== LOADING STATES ====================
+
   if (authLoading || fetchLoading) return <BloodLoader fullscreen={false} />;
 
+  // ==================== RENDER ====================
+
   return (
-    <div className="modal-box w-11/12 max-w-3xl p-0 overflow-hidden bg-base-100">
-      {/* Header */}
-      <div className="bg-linear-to-r from-blue-600 to-blue-400 p-6 text-white">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 p-3 rounded-full">
-              <FaUserEdit size={24} />
+    <motion.div
+      variants={modalVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className="modal-box w-11/12 max-w-3xl p-0 overflow-hidden bg-base-100 mx-2 sm:mx-0"
+    >
+
+      {/* ==================== MODAL HEADER ==================== */}
+      <div className="bg-linear-to-r from-blue-600 to-blue-400 p-4 sm:p-6 text-white">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+
+          {/* Title and icon */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="bg-white/20 p-2 sm:p-3 rounded-full">
+              <FaUserEdit size={20} className="sm:w-6 sm:h-6" />
             </div>
             <div>
-              <h3 className="font-bold text-2xl">Edit User</h3>
-              <p className="text-white/80 text-sm">Update user information</p>
+              <h2 className="font-bold text-lg sm:text-2xl">Edit User</h2>
+              <p className="text-white/80 text-xs sm:text-sm">Update user information</p>
             </div>
           </div>
+
+          {/* Close button */}
           <button
             onClick={closeModal}
-            className="btn btn-ghost btn-sm btn-circle text-white hover:bg-white/20"
+            className="btn btn-ghost btn-xs sm:btn-sm btn-circle text-white hover:bg-white/20 self-end sm:self-auto"
+            aria-label="Close modal"
           >
-            <FaTimes size={20} />
+            <FaTimes size={14} className="sm:w-5 sm:h-5" />
           </button>
         </div>
       </div>
 
-      {/* Progress Steps */}
-      <div className="px-6 pt-6">
-        <ul className="steps steps-horizontal w-full">
-          <li className={`step ${step >= 1 ? "step-primary" : ""}`}>Basic Info</li>
-          <li className={`step ${step >= 2 ? "step-primary" : ""}`}>Role & Blood</li>
-          <li className={`step ${step >= 3 ? "step-primary" : ""}`}>Personal</li>
-          <li className={`step ${step >= 4 ? "step-primary" : ""}`}>Address</li>
-          <li className={`step ${step >= 5 ? "step-primary" : ""}`}>Settings</li>
-        </ul>
+      {/* ==================== PROGRESS STEPS ==================== */}
+      <div className="px-4 sm:px-6 pt-4 sm:pt-6">
+        <div className="steps steps-horizontal w-full overflow-x-auto pb-2 flex-nowrap">
+          <div className={`step step-xs sm:step-md ${step >= 1 ? "step-primary" : ""}`}>Basic Info</div>
+          <div className={`step step-xs sm:step-md ${step >= 2 ? "step-primary" : ""}`}>Role & Blood</div>
+          <div className={`step step-xs sm:step-md ${step >= 3 ? "step-primary" : ""}`}>Personal</div>
+          <div className={`step step-xs sm:step-md ${step >= 4 ? "step-primary" : ""}`}>Address</div>
+          <div className={`step step-xs sm:step-md ${step >= 5 ? "step-primary" : ""}`}>Settings</div>
+        </div>
       </div>
 
-      {/* Inline API Error Message */}
-      {apiError && (
-        <div className="px-6 pt-4">
-          <div className="alert alert-error shadow-lg">
-            <div className="flex items-center gap-2">
-              <FaExclamationCircle size={20} />
-              <span>{apiError}</span>
+      {/* ==================== API ERROR MESSAGE ==================== */}
+      <AnimatePresence>
+        {apiError && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="px-4 sm:px-6 pt-4"
+          >
+            <div className="alert alert-error shadow-lg p-3 sm:p-4">
+              <div className="flex items-center gap-2">
+                <FaExclamationCircle size={16} className="sm:w-5 sm:h-5 shrink-0" />
+                <span className="text-xs sm:text-sm">{apiError}</span>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="p-6 max-h-[60vh] overflow-y-auto">
-          {/* Step 1: Basic Information */}
+        <div className="p-4 sm:p-6 max-h-[50vh] sm:max-h-[60vh] overflow-y-auto">
+
+          {/* ==================== STEP 1: BASIC INFORMATION ==================== */}
           {step === 1 && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step1"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
+              {/* Full Name */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaUser className="text-primary" /> Full Name
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaUser className="text-primary" size={12} />
+                    Full Name
                   </span>
                 </label>
                 <input
                   type="text"
                   placeholder="Enter full name"
-                  className={`input input-bordered w-full ${errors.fullName ? "input-error" : ""}`}
+                  className={`input input-bordered input-sm sm:input-md w-full ${errors.fullName ? "input-error" : ""}`}
                   {...register("fullName", {
                     required: "Full name is required",
                     minLength: {
@@ -423,22 +544,24 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
                   })}
                 />
                 {errors.fullName && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.fullName.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.fullName.message}</span>
                   </label>
                 )}
               </div>
 
+              {/* Email (disabled) */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaEnvelope className="text-primary" /> Email Address
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaEnvelope className="text-primary" size={12} />
+                    Email Address
                   </span>
                 </label>
                 <input
                   type="email"
                   placeholder="user@example.com"
-                  className={`input input-bordered w-full ${errors.email ? "input-error" : ""}`}
+                  className={`input input-bordered input-sm sm:input-md w-full ${errors.email ? "input-error" : ""}`}
                   {...register("email", {
                     required: "Email is required",
                     pattern: {
@@ -449,22 +572,24 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
                   disabled // Email shouldn't be editable
                 />
                 {errors.email && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.email.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.email.message}</span>
                   </label>
                 )}
               </div>
 
+              {/* Phone */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaPhone className="text-primary" /> Phone Number
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaPhone className="text-primary" size={12} />
+                    Phone Number
                   </span>
                 </label>
                 <input
                   type="tel"
                   placeholder="+1234567890"
-                  className={`input input-bordered w-full ${errors.phone ? "input-error" : ""}`}
+                  className={`input input-bordered input-sm sm:input-md w-full ${errors.phone ? "input-error" : ""}`}
                   {...register("phone", {
                     required: "Phone number is required",
                     pattern: {
@@ -474,41 +599,45 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
                   })}
                 />
                 {errors.phone && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.phone.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.phone.message}</span>
                   </label>
                 )}
               </div>
             </motion.div>
           )}
 
-          {/* Step 2: Role & Blood Group */}
+          {/* ==================== STEP 2: ROLE & BLOOD GROUP ==================== */}
           {step === 2 && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step2"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
+              {/* Blood Type Selection */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaTint className="text-primary" /> Blood Type
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaTint className="text-primary" size={12} />
+                    Blood Type
                   </span>
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {bloodTypes.map((type) => (
+                <div className="grid grid-cols-2 xs:grid-cols-4 gap-2">
+                  {BLOOD_TYPES.map((type) => (
                     <label key={type} className="cursor-pointer">
                       <input
                         type="radio"
                         value={type}
-                        className="hidden peer"
+                        className="hidden"
                         {...register("bloodGroup", {
                           required: "Please select blood type",
                         })}
                       />
                       <div
-                        className={`btn btn-sm w-full ${selectedBloodGroup === type
+                        className={`btn btn-xs sm:btn-sm w-full ${selectedBloodGroup === type
                           ? "btn-primary text-white"
                           : "btn-outline btn-primary"
                           }`}
@@ -519,111 +648,124 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
                   ))}
                 </div>
                 {errors.bloodGroup && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.bloodGroup.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.bloodGroup.message}</span>
                   </label>
                 )}
               </div>
 
+              {/* Role Selection */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaUser className="text-primary" /> User Role
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaUser className="text-primary" size={12} />
+                    User Role
                   </span>
                 </label>
                 <div className="grid grid-cols-1 gap-2">
                   {roles.map((role) => {
                     const Icon = role.icon;
                     const isSelected = selectedRole === role.value;
+                    const isDisabled = currentUser?.role !== "super_admin" && role.value === "admin";
+
                     return (
                       <label
                         key={role.value}
-                        className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${isSelected
-                          ? `border-${role.color} bg-${role.color}/10`
-                          : 'border-base-300 hover:border-primary/50'
+                        className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border-2 cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''
+                          } ${isSelected
+                            ? `border-${role.color} bg-${role.color}/10`
+                            : 'border-base-300 hover:border-primary/50'
                           }`}
                       >
                         <input
                           type="radio"
                           value={role.value}
                           className="hidden"
+                          disabled={isDisabled}
                           {...register("role", {
                             required: "Please select role",
                           })}
-                          disabled={currentUser?.role !== "super_admin" && role.value === "admin"}
                         />
-                        <Icon className={`text-xl ${isSelected ? `text-${role.color}` : 'text-gray-400'}`} />
+                        <Icon className={`text-base sm:text-xl ${isSelected ? `text-${role.color}` : 'text-gray-400'}`} />
                         <div className="flex-1">
-                          <p className={`font-semibold ${isSelected ? `text-${role.color}` : ''}`}>
+                          <p className={`font-semibold text-xs sm:text-sm ${isSelected ? `text-${role.color}` : ''}`}>
                             {role.label}
                           </p>
-                          <p className="text-xs opacity-70">{role.description}</p>
+                          <p className="text-[10px] sm:text-xs opacity-70">{role.description}</p>
                         </div>
                         {isSelected && (
-                          <FaCheckCircle className={`text-${role.color}`} />
+                          <FaCheckCircle className={`text-${role.color} text-xs sm:text-sm`} />
                         )}
                       </label>
                     );
                   })}
                 </div>
                 {errors.role && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.role.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.role.message}</span>
                   </label>
                 )}
               </div>
             </motion.div>
           )}
 
-          {/* Step 3: Personal Information */}
+          {/* ==================== STEP 3: PERSONAL INFORMATION ==================== */}
           {step === 3 && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step3"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
+              {/* Date of Birth */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaCalendarAlt className="text-primary" /> Date of Birth
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaCalendarAlt className="text-primary" size={12} />
+                    Date of Birth
                   </span>
                 </label>
                 <input
                   type="date"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   {...register("dateOfBirth")}
                 />
               </div>
 
+              {/* Gender */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaVenusMars className="text-primary" /> Gender
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaVenusMars className="text-primary" size={12} />
+                    Gender
                   </span>
                 </label>
                 <select
-                  className="select select-bordered w-full"
+                  className="select select-bordered select-sm sm:select-md w-full"
                   {...register("gender")}
                 >
                   <option value="">Select Gender</option>
-                  {genders.map(gender => (
+                  {GENDERS.map(gender => (
                     <option key={gender} value={gender}>{gender}</option>
                   ))}
                 </select>
               </div>
 
+              {/* Weight */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaWeight className="text-primary" /> Weight (kg)
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaWeight className="text-primary" size={12} />
+                    Weight (kg)
                   </span>
                 </label>
                 <input
                   type="number"
                   step="0.1"
                   placeholder="Enter weight"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   {...register("weight", {
                     min: {
                       value: 30,
@@ -636,83 +778,93 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
                   })}
                 />
                 {errors.weight && (
-                  <label className="label">
-                    <span className="label-text-alt text-error">{errors.weight.message}</span>
+                  <label className="label py-1">
+                    <span className="label-text-alt text-error text-xs">{errors.weight.message}</span>
                   </label>
                 )}
               </div>
             </motion.div>
           )}
 
-          {/* Step 4: Address */}
+          {/* ==================== STEP 4: ADDRESS ==================== */}
           {step === 4 && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step4"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
+              {/* Street Address */}
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text flex items-center gap-2">
-                    <FaMapMarkerAlt className="text-primary" /> Street Address
+                <label className="label py-1">
+                  <span className="label-text text-xs sm:text-sm flex items-center gap-2">
+                    <FaMapMarkerAlt className="text-primary" size={12} />
+                    Street Address
                   </span>
                 </label>
                 <input
                   type="text"
                   placeholder="Street address"
-                  className="input input-bordered w-full"
+                  className="input input-bordered input-sm sm:input-md w-full"
                   {...register("street")}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* City & State Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* City */}
                 <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">City</span>
+                  <label className="label py-1">
+                    <span className="label-text text-xs sm:text-sm">City</span>
                   </label>
                   <input
                     type="text"
                     placeholder="City"
-                    className="input input-bordered w-full"
+                    className="input input-bordered input-sm sm:input-md w-full"
                     {...register("city")}
                   />
                 </div>
 
+                {/* State */}
                 <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">State</span>
+                  <label className="label py-1">
+                    <span className="label-text text-xs sm:text-sm">State</span>
                   </label>
                   <input
                     type="text"
                     placeholder="State"
-                    className="input input-bordered w-full"
+                    className="input input-bordered input-sm sm:input-md w-full"
                     {...register("state")}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Zip Code & Country Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Zip Code */}
                 <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Zip Code</span>
+                  <label className="label py-1">
+                    <span className="label-text text-xs sm:text-sm">Zip Code</span>
                   </label>
                   <input
                     type="text"
                     placeholder="Zip Code"
-                    className="input input-bordered w-full"
+                    className="input input-bordered input-sm sm:input-md w-full"
                     {...register("zipCode")}
                   />
                 </div>
 
+                {/* Country */}
                 <div className="form-control">
-                  <label className="label">
-                    <span className="label-text">Country</span>
+                  <label className="label py-1">
+                    <span className="label-text text-xs sm:text-sm">Country</span>
                   </label>
                   <input
                     type="text"
                     placeholder="Country"
-                    className="input input-bordered w-full"
+                    className="input input-bordered input-sm sm:input-md w-full"
                     {...register("country")}
                   />
                 </div>
@@ -720,142 +872,142 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
             </motion.div>
           )}
 
-          {/* Step 5: Settings & Verification (Admin only) */}
+          {/* ==================== STEP 5: SETTINGS & VERIFICATION ==================== */}
           {step === 5 && (currentUser?.role === "admin" || currentUser?.role === "super_admin") && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step5-admin"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-4 sm:space-y-6"
             >
-              <div className="bg-base-200 rounded-lg p-4">
-                <h4 className="font-semibold flex items-center gap-2 mb-3">
+
+              {/* Verification Status */}
+              <div className="bg-base-200 rounded-xl p-4 sm:p-6 space-y-4">
+                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <FaIdCard className="text-primary" />
                   Verification Status
                 </h4>
-                <div className="space-y-2">
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("isEmailVerified")}
-                    />
-                    <span className="label-text">Email Verified</span>
-                  </label>
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("isPhoneVerified")}
-                    />
-                    <span className="label-text">Phone Verified</span>
-                  </label>
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("isIdentityVerified")}
-                    />
-                    <span className="label-text">Identity Verified</span>
-                  </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    { name: "isEmailVerified", label: "Email Verified" },
+                    { name: "isPhoneVerified", label: "Phone Verified" },
+                    { name: "isIdentityVerified", label: "Identity Verified" },
+                  ].map((item) => (
+                    <label
+                      key={item.name}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-base-300 hover:border-primary transition cursor-pointer bg-base-100"
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        {...register(item.name)}
+                      />
+                      <span className="text-xs sm:text-sm font-medium">
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
-              <div className="bg-base-200 rounded-lg p-4">
-                <h4 className="font-semibold flex items-center gap-2 mb-3">
+              {/* Notification Settings */}
+              <div className="bg-base-200 rounded-xl p-4 sm:p-6 space-y-4">
+                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <FaBell className="text-primary" />
                   Notification Settings
                 </h4>
-                <div className="space-y-2">
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("emailNotifications")}
-                    />
-                    <span className="label-text">Email Notifications</span>
-                  </label>
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("smsNotifications")}
-                    />
-                    <span className="label-text">SMS Notifications</span>
-                  </label>
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("pushNotifications")}
-                    />
-                    <span className="label-text">Push Notifications</span>
-                  </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    { name: "emailNotifications", label: "Email Notifications" },
+                    { name: "smsNotifications", label: "SMS Notifications" },
+                    { name: "pushNotifications", label: "Push Notifications" },
+                  ].map((item) => (
+                    <label
+                      key={item.name}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-base-300 hover:border-primary transition cursor-pointer bg-base-100"
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        {...register(item.name)}
+                      />
+                      <span className="text-xs sm:text-sm font-medium">
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
 
-              <div className="bg-base-200 rounded-lg p-4">
-                <h4 className="font-semibold flex items-center gap-2 mb-3">
+              {/* Privacy Settings */}
+              <div className="bg-base-200 rounded-xl p-4 sm:p-6 space-y-4">
+                <h4 className="font-semibold text-sm sm:text-base flex items-center gap-2">
                   <FaGlobe className="text-primary" />
                   Privacy Settings
                 </h4>
-                <div className="space-y-2">
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("showLocation")}
-                    />
-                    <span className="label-text">Show Location</span>
-                  </label>
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("showContact")}
-                    />
-                    <span className="label-text">Show Contact Info</span>
-                  </label>
-                  <label className="label cursor-pointer justify-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm"
-                      {...register("showLastDonation")}
-                    />
-                    <span className="label-text">Show Last Donation</span>
-                  </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {[
+                    { name: "showLocation", label: "Show Location" },
+                    { name: "showContact", label: "Show Contact Info" },
+                    { name: "showLastDonation", label: "Show Last Donation" },
+                  ].map((item) => (
+                    <label
+                      key={item.name}
+                      className="flex items-center gap-3 p-3 rounded-lg border border-base-300 hover:border-primary transition cursor-pointer bg-base-100"
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-primary"
+                        {...register(item.name)}
+                      />
+                      <span className="text-xs sm:text-sm font-medium">
+                        {item.label}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
+
             </motion.div>
           )}
 
-          {/* Step 5 for non-admin (just summary) */}
+          {/* ==================== STEP 5 FOR NON-ADMIN ==================== */}
           {step === 5 && currentUser?.role !== "admin" && currentUser?.role !== "super_admin" && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+              key="step5-summary"
+              variants={stepVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-3 sm:space-y-4"
             >
-              <div className="alert alert-info bg-info/10 border-info/20">
-                <FaCheckCircle className="text-info" />
-                <span>Review the information before updating.</span>
+              <div className="alert alert-info bg-info/10 border-info/20 flex-col sm:flex-row gap-2 p-3 sm:p-4">
+                <FaCheckCircle className="text-info text-lg sm:text-xl shrink-0" />
+                <span className="text-xs sm:text-sm text-center sm:text-left">
+                  Review the information before updating.
+                </span>
               </div>
 
-              <div className="bg-base-200 rounded-lg p-4 space-y-3">
-                <h4 className="font-semibold">User Information</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+              {/* User Information Summary */}
+              <div className="bg-base-200 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
+                <h4 className="font-semibold text-xs sm:text-sm">User Information</h4>
+                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2 sm:gap-3 text-[10px] sm:text-xs">
                   <div>
                     <p className="opacity-70">Full Name</p>
-                    <p className="font-medium">{watch("fullName")}</p>
+                    <p className="font-medium wrap-break-word">{watch("fullName")}</p>
                   </div>
                   <div>
                     <p className="opacity-70">Email</p>
-                    <p className="font-medium">{watch("email")}</p>
+                    <p className="font-medium wrap-break-word">{watch("email")}</p>
                   </div>
                   <div>
                     <p className="opacity-70">Phone</p>
-                    <p className="font-medium">{watch("phone")}</p>
+                    <p className="font-medium wrap-break-word">{watch("phone")}</p>
                   </div>
                   <div>
                     <p className="opacity-70">Blood Type</p>
@@ -871,58 +1023,74 @@ const EditUserModal = ({ userId, refreshUsers, onClose }) => {
           )}
         </div>
 
-        {/* Footer Actions */}
-        <div className="modal-action border-t border-base-300 p-4 bg-base-200/50">
-          <div className="flex justify-between w-full">
-            {step > 1 && (
+        {/* ==================== FOOTER ACTIONS ==================== */}
+        <div className="modal-action border-t border-base-300 bg-base-200/50 px-4 py-4">
+          <div className="flex flex-row items-center justify-between gap-3 w-full">
+
+            {/* LEFT SIDE - Previous */}
+            {step > 1 ? (
               <button
                 type="button"
                 onClick={prevStep}
-                className="btn btn-outline btn-primary"
+                className="btn btn-outline btn-primary btn-sm sm:btn-md w-1/2 sm:w-auto flex items-center gap-2"
               >
-                ← Previous
-              </button>
-            )}
-            {step < 5 ? (
-              <button
-                type="button"
-                onClick={nextStep}
-                className="btn btn-primary text-white ml-auto"
-              >
-                Next →
+                <span>←</span>
+                <span>Previous</span>
               </button>
             ) : (
-              <div className="flex gap-2 ml-auto">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="btn btn-ghost"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn btn-primary text-white gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <span className="loading loading-spinner loading-sm"></span>
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <FaUserEdit />
-                      Update User
-                    </>
-                  )}
-                </button>
-              </div>
+              <div />
             )}
+
+            {/* RIGHT SIDE - Cancel + Next / Submit */}
+            <div className="flex flex-col sm:flex-row gap-2 w-1/2 sm:w-auto sm:ml-auto">
+
+              {step < 5 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className="btn btn-primary text-white btn-sm sm:btn-md w-full sm:w-auto flex items-center justify-center gap-2"
+                  >
+                    <span>Next</span>
+                    <span>→</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    disabled={loading}
+                    className="btn btn-ghost btn-sm sm:btn-md w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed hidden md:block"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn btn-primary text-white btn-sm sm:btn-md w-full sm:w-auto flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <span className="loading loading-spinner loading-xs"></span>
+                        <span>Updating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FaUserEdit className="text-sm" />
+                        <span>Update User</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+
+            </div>
           </div>
         </div>
       </form>
-    </div>
+    </motion.div>
   );
 };
 

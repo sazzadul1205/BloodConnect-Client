@@ -13,7 +13,7 @@ import {
   FaTint, FaEnvelope, FaLock, FaEye, FaEyeSlash,
   FaArrowLeft, FaHeartbeat, FaShieldAlt, FaPhone,
   FaUserMd, FaHospital, FaUserTie, FaFlask, FaRocket,
-  FaUsers, FaCopy, FaTimes
+  FaUsers, FaTimes
 } from "react-icons/fa";
 
 // Hooks
